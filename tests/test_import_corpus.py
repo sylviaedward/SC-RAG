@@ -13,8 +13,11 @@ class CorpusImportTests(unittest.TestCase):
             first = root / "first.zip"
             second = root / "second.zip"
             output = root / "papers"
+            output.mkdir()
+            (output / "._old.pdf").write_bytes(b"AppleDouble metadata")
             with zipfile.ZipFile(first, "w") as archive:
                 archive.writestr("nested/paper.pdf", b"%PDF-first")
+                archive.writestr("__MACOSX/nested/._paper.pdf", b"AppleDouble metadata")
             with zipfile.ZipFile(second, "w") as archive:
                 archive.writestr("../duplicate.pdf", b"%PDF-first")
                 archive.writestr("other.pdf", b"%PDF-second")

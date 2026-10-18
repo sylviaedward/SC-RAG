@@ -15,6 +15,13 @@ def digest(data: bytes) -> str:
 
 def import_archives(archives: list[Path], output_dir: Path) -> tuple[int, int]:
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Finder stores resource forks as __MACOSX/._name.pdf. They share the PDF
+    # suffix but are AppleDouble metadata rather than readable papers. Remove
+    # any such files left by an earlier import before counting the corpus.
+    for sidecar in output_dir.glob("._*.pdf"):
+        sidecar.unlink()
+
     known_hashes: dict[str, Path] = {}
     for existing in output_dir.glob("*.pdf"):
         known_hashes[digest(existing.read_bytes())] = existing
@@ -28,7 +35,10 @@ def import_archives(archives: list[Path], output_dir: Path) -> tuple[int, int]:
             for member in bundle.infolist():
                 if member.is_dir() or not member.filename.lower().endswith(".pdf"):
                     continue
-                filename = PurePosixPath(member.filename).name
+                member_path = PurePosixPath(member.filename)
+                filename = member_path.name
+                if "__MACOSX" in member_path.parts or filename.startswith("._"):
+                    continue
                 if not filename:
                     continue
                 data = bundle.read(member)
