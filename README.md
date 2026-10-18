@@ -1,6 +1,6 @@
 # SC-RAG
 
-An evidence-grounded literature assistant for stochastic computing (SC). The first working slice ingests 50 papers into page-aware chunks, expands Chinese domain queries into English SC terminology, retrieves evidence with a reproducible BM25 baseline, and exposes citations through a FastAPI endpoint.
+An evidence-grounded literature assistant for stochastic computing (SC). It ingests 50 papers into page-aware chunks, runs bilingual hybrid retrieval, and produces claim-level answers whose quotations, chunks, and PDF pages are validated before delivery.
 
 ## Current capabilities
 
@@ -10,6 +10,9 @@ An evidence-grounded literature assistant for stochastic computing (SC). The fir
 - Chinese/English domain term expansion and BM25 retrieval
 - Search API returning paper title, benchmark alias, PDF page, score, and source text
 - Retrieval evaluation using gold paper aliases
+- BM25 + multilingual dense retrieval with reciprocal-rank fusion
+- OpenAI-compatible grounded generation with exact-quote citation checks
+- Explicit abstention for missing evidence or invalid model output
 
 Raw PDFs, source evaluation documents, generated chunks, and evaluation reports are intentionally ignored by Git.
 
@@ -37,6 +40,7 @@ Run a query, the benchmark, and the API:
 ```bash
 make search QUERY="随机计算中的相关性如何影响乘法器精度？"
 make evaluate
+make answer QUERY="单极格式下什么逻辑门实现乘法？" ANSWER_MODE=fundamentals
 make api
 ```
 
@@ -54,4 +58,4 @@ Python 3.11+ and Poppler (`pdfinfo`, `pdftotext`) are required. `make system-dep
 
 See [the data audit](docs/data_audit.md) for known corpus and benchmark limitations.
 The [completion and learning roadmap](docs/learning_roadmap.md) pairs every implementation phase with concepts, acceptance criteria, and likely interview questions.
-For the current hybrid-retrieval stage, follow the [Phase 1 Chinese operating and code guide](docs/phase1_guide.zh-CN.md).
+For retrieval experiments, follow the [Phase 1 Chinese guide](docs/phase1_guide.zh-CN.md). For grounded answers, citation validation, and abstention evaluation, follow the [Phase 2 Chinese guide](docs/phase2_guide.zh-CN.md).

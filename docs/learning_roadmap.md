@@ -42,7 +42,7 @@ Likely interview questions:
 - Why is an 86% Hit-any score insufficient for cross-paper questions?
 - What is the difference between PDF page number and printed paper page number?
 
-## Phase 1 — Hybrid retrieval (current)
+## Phase 1 — Hybrid retrieval (completed)
 
 Build:
 
@@ -67,7 +67,7 @@ Likely interview questions:
 - Why rerank only a candidate set instead of the entire corpus?
 - How would you update or delete one paper from the index?
 
-## Phase 2 — Evidence-grounded answering
+## Phase 2 — Evidence-grounded answering (current)
 
 Build:
 

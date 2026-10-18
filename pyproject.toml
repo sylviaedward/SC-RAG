@@ -28,6 +28,7 @@ sc-rag-ingest = "sc_rag.ingest:main"
 sc-rag-search = "sc_rag.search:main"
 sc-rag-dense-search = "sc_rag.dense:main"
 sc-rag-hybrid-search = "sc_rag.hybrid:main"
+sc-rag-answer = "sc_rag.answering:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

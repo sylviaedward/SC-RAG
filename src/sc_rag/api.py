@@ -7,7 +7,8 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import RedirectResponse
 
-from .models import SearchResponse
+from .answering import GroundedAnswerService, OpenAICompatibleChatClient, build_hybrid_retriever
+from .models import AnswerRequest, AnswerResponse, SearchResponse
 from .search import BM25Index
 
 
@@ -28,6 +29,20 @@ def get_index() -> BM25Index:
     return BM25Index.from_jsonl(path)
 
 
+@lru_cache(maxsize=1)
+def get_answer_service() -> GroundedAnswerService:
+    return GroundedAnswerService(
+        build_hybrid_retriever(
+            chunks=Path(os.getenv("SC_RAG_INDEX", "artifacts/chunks.jsonl")),
+            matrix=Path(os.getenv("SC_RAG_DENSE_MATRIX", "artifacts/dense/embeddings.npy")),
+            metadata=Path(os.getenv("SC_RAG_DENSE_METADATA", "artifacts/dense/metadata.json")),
+            embedding_provider=os.getenv("SC_RAG_EMBEDDING_PROVIDER", "local"),
+            embedding_model=os.getenv("SC_RAG_EMBEDDING_MODEL", "intfloat/multilingual-e5-small"),
+        ),
+        OpenAICompatibleChatClient.from_env(),
+    )
+
+
 @app.get("/health")
 def health() -> dict[str, object]:
     try:
@@ -45,5 +60,13 @@ def search(
     try:
         return get_index().search(q, limit)
     except (FileNotFoundError, ValueError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.post("/answer", response_model=AnswerResponse)
+def answer(request: AnswerRequest) -> AnswerResponse:
+    try:
+        return get_answer_service().answer(request.question, request.mode)
+    except (FileNotFoundError, RuntimeError, ValueError) as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 
