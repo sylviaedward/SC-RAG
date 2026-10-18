@@ -7,7 +7,7 @@ CANDIDATE_K ?= 40
 RERANK_K ?= 30
 MAX_PER_PAPER ?= 2
 
-.PHONY: system-deps setup setup-hybrid import-corpus manifest ingest dense-index test search dense-search hybrid-search-rrf hybrid-search evaluate evaluate-phase1-core evaluate-phase1-reranker evaluate-phase1 api
+.PHONY: system-deps setup setup-hybrid import-corpus manifest ingest dense-index test search dense-search hybrid-search-rrf hybrid-search evaluate evaluate-phase1-core evaluate-phase1-reranker analyze-phase1 evaluate-phase1 api
 
 system-deps:
 	@if command -v pdfinfo >/dev/null && command -v pdftotext >/dev/null; then \
@@ -67,6 +67,9 @@ evaluate-phase1-core:
 
 evaluate-phase1-reranker:
 	$(PYTHON) scripts/evaluate_phase1.py --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)" --reranker-model "$(RERANKER_MODEL)" --candidate-k $(CANDIDATE_K) --rerank-k $(RERANK_K) --max-per-paper $(MAX_PER_PAPER) --stages reranker --output artifacts/phase1_reranker_eval.json --k 10
+
+analyze-phase1:
+	$(PYTHON) scripts/analyze_phase1_failures.py
 
 evaluate-phase1: evaluate-phase1-core evaluate-phase1-reranker
 
