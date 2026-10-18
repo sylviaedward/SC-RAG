@@ -128,6 +128,9 @@ def main() -> None:
     parser.add_argument("--embedding-model", default=DEFAULT_EMBEDDING_MODEL)
     parser.add_argument("--embedding-provider", choices=("local", "api"), default="local")
     parser.add_argument("--reranker-model", default=DEFAULT_RERANKER_MODEL)
+    parser.add_argument("--candidate-k", type=int, default=40)
+    parser.add_argument("--rerank-k", type=int, default=30)
+    parser.add_argument("--max-per-paper", type=int, default=2)
     parser.add_argument("--no-reranker", action="store_true")
     parser.add_argument("--limit", type=int, default=5)
     args = parser.parse_args()
@@ -135,7 +138,14 @@ def main() -> None:
     embedder = create_embedder(args.embedding_provider, args.embedding_model)
     dense = DenseIndex.from_artifacts(args.chunks, args.matrix, args.metadata, embedder)
     reranker = None if args.no_reranker else CrossEncoderReranker(args.reranker_model)
-    retriever = HybridRetriever(BM25Index.from_jsonl(args.chunks), dense, reranker=reranker)
+    retriever = HybridRetriever(
+        BM25Index.from_jsonl(args.chunks),
+        dense,
+        reranker=reranker,
+        candidate_k=args.candidate_k,
+        rerank_k=args.rerank_k,
+        max_per_paper=args.max_per_paper,
+    )
     response = retriever.search(args.query, args.limit)
     print(json.dumps(response.model_dump(), ensure_ascii=False, indent=2))
 

@@ -3,6 +3,9 @@ PORT ?= 8000
 EMBEDDING_MODEL ?= intfloat/multilingual-e5-small
 EMBEDDING_PROVIDER ?= local
 RERANKER_MODEL ?= cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+CANDIDATE_K ?= 40
+RERANK_K ?= 30
+MAX_PER_PAPER ?= 2
 
 .PHONY: system-deps setup setup-hybrid import-corpus manifest ingest dense-index test search dense-search hybrid-search-rrf hybrid-search evaluate evaluate-phase1-core evaluate-phase1-reranker evaluate-phase1 api
 
@@ -50,20 +53,20 @@ dense-search:
 
 hybrid-search-rrf:
 	@test -n "$(QUERY)" || (echo 'Usage: make hybrid-search-rrf QUERY="your question"' && exit 2)
-	$(PYTHON) -m sc_rag.hybrid "$(QUERY)" --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)" --no-reranker --limit 5
+	$(PYTHON) -m sc_rag.hybrid "$(QUERY)" --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)" --candidate-k $(CANDIDATE_K) --max-per-paper $(MAX_PER_PAPER) --no-reranker --limit 5
 
 hybrid-search:
 	@test -n "$(QUERY)" || (echo 'Usage: make hybrid-search QUERY="your question"' && exit 2)
-	$(PYTHON) -m sc_rag.hybrid "$(QUERY)" --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)" --reranker-model "$(RERANKER_MODEL)" --limit 5
+	$(PYTHON) -m sc_rag.hybrid "$(QUERY)" --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)" --reranker-model "$(RERANKER_MODEL)" --candidate-k $(CANDIDATE_K) --rerank-k $(RERANK_K) --max-per-paper $(MAX_PER_PAPER) --limit 5
 
 evaluate:
 	$(PYTHON) scripts/evaluate_retrieval.py --k 10
 
 evaluate-phase1-core:
-	$(PYTHON) scripts/evaluate_phase1.py --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)" --reranker-model "$(RERANKER_MODEL)" --stages bm25 dense hybrid --output artifacts/phase1_core_eval.json --k 10
+	$(PYTHON) scripts/evaluate_phase1.py --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)" --reranker-model "$(RERANKER_MODEL)" --candidate-k $(CANDIDATE_K) --max-per-paper $(MAX_PER_PAPER) --stages bm25 dense hybrid --output artifacts/phase1_core_eval.json --k 10
 
 evaluate-phase1-reranker:
-	$(PYTHON) scripts/evaluate_phase1.py --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)" --reranker-model "$(RERANKER_MODEL)" --stages reranker --output artifacts/phase1_reranker_eval.json --k 10
+	$(PYTHON) scripts/evaluate_phase1.py --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)" --reranker-model "$(RERANKER_MODEL)" --candidate-k $(CANDIDATE_K) --rerank-k $(RERANK_K) --max-per-paper $(MAX_PER_PAPER) --stages reranker --output artifacts/phase1_reranker_eval.json --k 10
 
 evaluate-phase1: evaluate-phase1-core evaluate-phase1-reranker
 

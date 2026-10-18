@@ -23,6 +23,9 @@ def main() -> None:
     parser.add_argument("--embedding-model", default=DEFAULT_EMBEDDING_MODEL)
     parser.add_argument("--embedding-provider", choices=("local", "api"), default="local")
     parser.add_argument("--reranker-model", default=DEFAULT_RERANKER_MODEL)
+    parser.add_argument("--candidate-k", type=int, default=40)
+    parser.add_argument("--rerank-k", type=int, default=30)
+    parser.add_argument("--max-per-paper", type=int, default=2)
     parser.add_argument("--k", type=int, default=10)
     parser.add_argument(
         "--stages",
@@ -39,7 +42,12 @@ def main() -> None:
     retrievers = {
         "bm25": bm25,
         "dense": dense,
-        "hybrid": HybridRetriever(bm25, dense),
+        "hybrid": HybridRetriever(
+            bm25,
+            dense,
+            candidate_k=args.candidate_k,
+            max_per_paper=args.max_per_paper,
+        ),
     }
     if "reranker" in args.stages:
         print("loading cross-encoder reranker...", flush=True)
@@ -47,6 +55,9 @@ def main() -> None:
             bm25,
             dense,
             reranker=CrossEncoderReranker(args.reranker_model),
+            candidate_k=args.candidate_k,
+            rerank_k=args.rerank_k,
+            max_per_paper=args.max_per_paper,
         )
 
     reports = []
