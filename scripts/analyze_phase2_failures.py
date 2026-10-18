@@ -15,12 +15,14 @@ VALIDATION_REASONS = {
     "claim_contained_duplicate_citations",
     "claim_referenced_unknown_evidence",
     "citation_quote_not_found_in_evidence",
+    "partial_output_contained_no_missing_information",
+    "sufficient_output_contained_missing_information",
 }
 
 
 def reason_code(row: dict[str, object]) -> str:
-    if row["status"] == "answered":
-        return "accepted"
+    if row["status"] in {"answered", "partial"}:
+        return f"accepted_{row['status']}"
     response = row["response"]
     reason = str(response["reason"])
     if reason.startswith("model_output_validation_failed"):
@@ -41,28 +43,30 @@ def analyze(report: dict[str, object]) -> dict[str, object]:
         lambda: {"questions": 0, "answered": 0, "gold_hit_any": 0, "gold_hit_all": 0}
     )
     failures: dict[str, list[str]] = defaultdict(list)
-    answered_rows = []
+    accepted_rows = []
     for row in rows:
         category = str(row["category"])
         bucket = categories[category]
         bucket["questions"] += 1
-        if row["status"] == "answered":
+        if row["status"] in {"answered", "partial"}:
             bucket["answered"] += 1
             bucket["gold_hit_any"] += int(bool(row["gold_hit_any"]))
             bucket["gold_hit_all"] += int(bool(row["gold_hit_all"]))
-            answered_rows.append(row)
+            accepted_rows.append(row)
         else:
             failures[reason_code(row)].append(str(row["id"]))
 
     return {
         "evaluated_questions": len(rows),
-        "accepted_answers": len(answered_rows),
+        "accepted_answers": len(accepted_rows),
+        "full_answers": sum(row["status"] == "answered" for row in accepted_rows),
+        "partial_answers": sum(row["status"] == "partial" for row in accepted_rows),
         "conditional_citation_gold_hit_any": round(
-            sum(bool(row["gold_hit_any"]) for row in answered_rows) / len(answered_rows), 4
-        ) if answered_rows else None,
+            sum(bool(row["gold_hit_any"]) for row in accepted_rows) / len(accepted_rows), 4
+        ) if accepted_rows else None,
         "conditional_citation_gold_hit_all": round(
-            sum(bool(row["gold_hit_all"]) for row in answered_rows) / len(answered_rows), 4
-        ) if answered_rows else None,
+            sum(bool(row["gold_hit_all"]) for row in accepted_rows) / len(accepted_rows), 4
+        ) if accepted_rows else None,
         "reason_counts": dict(reasons.most_common()),
         "categories": dict(sorted(categories.items())),
         "failure_ids": dict(sorted(failures.items())),
@@ -74,6 +78,7 @@ def render_markdown(analysis: dict[str, object]) -> str:
         "# Phase 2 failure analysis",
         "",
         f"Accepted {analysis['accepted_answers']} of {analysis['evaluated_questions']} answers.",
+        f"Full answers: {analysis['full_answers']}; partial answers: {analysis['partial_answers']}.",
         f"Conditional citation gold Hit-any: {analysis['conditional_citation_gold_hit_any']}",
         f"Conditional citation gold Hit-all: {analysis['conditional_citation_gold_hit_all']}",
         "",

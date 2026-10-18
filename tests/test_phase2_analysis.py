@@ -50,6 +50,26 @@ class Phase2AnalysisTests(unittest.TestCase):
         self.assertEqual(analysis["reason_counts"]["citation_quote_not_found_in_evidence"], 1)
         self.assertEqual(analysis["reason_counts"]["model_declared_insufficient"], 1)
 
+    def test_partial_answers_count_as_accepted(self) -> None:
+        report = {
+            "results": [
+                {
+                    "id": "C1",
+                    "category": "cross_paper",
+                    "status": "partial",
+                    "gold_hit_any": True,
+                    "gold_hit_all": False,
+                    "response": {"reason": "some dimensions missing", "evidence_sufficiency": "partial"},
+                }
+            ]
+        }
+
+        analysis = MODULE.analyze(report)
+
+        self.assertEqual(analysis["accepted_answers"], 1)
+        self.assertEqual(analysis["partial_answers"], 1)
+        self.assertEqual(analysis["conditional_citation_gold_hit_any"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,14 +7,14 @@ Phase 2 的目标不是“让 LLM 看起来会回答”，而是让系统只交�
 ```text
 问题 + 回答模式
   -> Hybrid RRF 检索 Top-10
-  -> 上下文预算裁剪（最多 8 chunks / 9000 字符）
+  -> 上下文预算裁剪（最多 10 chunks / 14000 字符）
   -> 将论文内容标记为不可信数据
   -> OpenAI-compatible Chat Completions
   -> 严格 JSON 解析
   -> evidence ID 白名单校验
   -> 支持性原文摘录校验
   -> 应用层绑定 alias、chunk ID、PDF 页码
-  -> 有引用回答或显式拒答
+  -> 完整回答、带缺失项的部分回答，或显式拒答
 ```
 
 回答支持三种显式模式和一种自动判断模式：
@@ -70,7 +70,7 @@ make answer \
   ANSWER_MODE=paper_lookup
 ```
 
-第一个结果应为 `status: answered`，并在每个 claim 下包含真实的 `chunk_id`、论文别名和 PDF 页码。第二个结果应为 `status: abstained`。如果模型输出了不存在的 evidence ID，或给出的 quote 无法在对应 chunk 中找到，系统也会返回 `abstained`，并在 `reason` 中说明校验失败原因。
+第一个结果应为 `status: answered` 或 `partial`，并在每个 claim 下包含真实的 `chunk_id`、论文别名和 PDF 页码。`partial` 只保留有证据的 claim，并在 `missing_information` 中明确尚无证据的子问题。第二个结果应为 `status: abstained`。如果模型输出了不存在的 evidence ID，或给出的 quote 无法在对应 chunk 中找到，系统也会返回 `abstained`，并在 `reason` 中说明校验失败原因。
 
 ## 4. 运行 Phase 2 评测
 
@@ -105,10 +105,11 @@ cat artifacts/phase2_failure_analysis.md
 
 评测逐题写入 JSON，中途发生网络错误时，已完成结果仍会保留。主要指标含义：
 
-- `behavior_accuracy`：可回答题作答、不可回答题拒答的比例；
+- `behavior_accuracy`：可回答题给出完整或部分证据回答、不可回答题拒答的比例；
+- `full_answer_rate_on_answerable`、`partial_answer_rate_on_answerable`：区分完整回答和明确披露缺失项的部分回答；
 - `abstention_rate_on_unanswerable`：八道语料外问题的拒答率；
 - `citation_gold_hit_any/all`：最终 claim 引用是否覆盖 gold 论文；
-- `mean_claims_when_answered`：回答的原子 claim 数；
+- `mean_claims_when_responded`：完整和部分回答中的平均原子 claim 数；
 - `mean_latency_ms`：检索、生成和校验的端到端平均延迟。
 
 这里的 gold alias 指标验证引用论文是否正确，不等价于答案事实完全正确。Phase 4 会进一步加入原子答案评分。当前的 quote 校验确保引用文本真实存在，也不能单独证明摘录在语义上完整支持 claim；需要在失败分析中人工抽查。

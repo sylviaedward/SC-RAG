@@ -38,12 +38,14 @@ class AnswerMode(str, Enum):
 
 class EvidenceSufficiency(str, Enum):
     sufficient = "sufficient"
+    partial = "partial"
     insufficient = "insufficient"
     conflicting = "conflicting"
 
 
 class AnswerStatus(str, Enum):
     answered = "answered"
+    partial = "partial"
     abstained = "abstained"
 
 
@@ -76,6 +78,7 @@ class AnswerResponse(BaseModel):
     evidence_sufficiency: EvidenceSufficiency
     confidence: float = Field(ge=0, le=1)
     reason: str
+    missing_information: list[str] = Field(default_factory=list)
     retrieved_chunks: int = Field(ge=0)
     model: str
 

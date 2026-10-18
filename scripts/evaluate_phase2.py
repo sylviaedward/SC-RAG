@@ -12,7 +12,7 @@ from sc_rag.answering import GroundedAnswerService, OpenAICompatibleChatClient, 
 from sc_rag.models import AnswerMode, AnswerStatus
 
 
-PROMPT_VERSION = "phase2-grounded-v1"
+PROMPT_VERSION = "phase2-grounded-v2-partial"
 
 
 def read_jsonl(path: Path) -> list[dict[str, object]]:
@@ -71,6 +71,7 @@ def main() -> None:
         latency_ms = (time.perf_counter() - started) * 1000
         latencies.append(latency_ms)
         expected_answerable = bool(question["answerable"])
+        usable_response = response.status in {AnswerStatus.answered, AnswerStatus.partial}
         cited_aliases = sorted(
             {
                 citation.alias
@@ -84,7 +85,7 @@ def main() -> None:
             "category": question["category"],
             "expected_answerable": expected_answerable,
             "status": response.status.value,
-            "behavior_correct": (response.status == AnswerStatus.answered) == expected_answerable,
+            "behavior_correct": usable_response if expected_answerable else response.status == AnswerStatus.abstained,
             "cited_aliases": cited_aliases,
             "gold_hit_any": bool(gold_aliases & set(cited_aliases)) if expected_answerable else None,
             "gold_hit_all": gold_aliases <= set(cited_aliases) if expected_answerable else None,
@@ -102,15 +103,22 @@ def main() -> None:
 def build_report(scope: str, model: str, rows: list[dict[str, object]], latencies: list[float]) -> dict[str, object]:
     answerable = [row for row in rows if row["expected_answerable"]]
     unanswerable = [row for row in rows if not row["expected_answerable"]]
-    answered = [row for row in rows if row["status"] == AnswerStatus.answered.value]
+    responded = [row for row in rows if row["status"] in {AnswerStatus.answered.value, AnswerStatus.partial.value}]
     return {
         "scope": scope,
         "prompt_version": PROMPT_VERSION,
         "model": model,
         "evaluated_questions": len(rows),
         "behavior_accuracy": round(sum(bool(row["behavior_correct"]) for row in rows) / len(rows), 4),
-        "answer_rate_on_answerable": round(
+        "full_answer_rate_on_answerable": round(
             sum(row["status"] == AnswerStatus.answered.value for row in answerable) / len(answerable), 4
+        ) if answerable else None,
+        "partial_answer_rate_on_answerable": round(
+            sum(row["status"] == AnswerStatus.partial.value for row in answerable) / len(answerable), 4
+        ) if answerable else None,
+        "usable_response_rate_on_answerable": round(
+            sum(row["status"] in {AnswerStatus.answered.value, AnswerStatus.partial.value} for row in answerable)
+            / len(answerable), 4
         ) if answerable else None,
         "abstention_rate_on_unanswerable": round(
             sum(row["status"] == AnswerStatus.abstained.value for row in unanswerable) / len(unanswerable), 4
@@ -121,9 +129,9 @@ def build_report(scope: str, model: str, rows: list[dict[str, object]], latencie
         "citation_gold_hit_all": round(
             sum(bool(row["gold_hit_all"]) for row in answerable) / len(answerable), 4
         ) if answerable else None,
-        "mean_claims_when_answered": round(
-            sum(len(row["response"]["claims"]) for row in answered) / len(answered), 2
-        ) if answered else 0,
+        "mean_claims_when_responded": round(
+            sum(len(row["response"]["claims"]) for row in responded) / len(responded), 2
+        ) if responded else 0,
         "mean_latency_ms": round(sum(latencies) / len(latencies), 2),
         "results": rows,
     }
