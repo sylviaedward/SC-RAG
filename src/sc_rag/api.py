@@ -1,0 +1,42 @@
+from __future__ import annotations
+
+import os
+from functools import lru_cache
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Query
+
+from .models import SearchResponse
+from .search import BM25Index
+
+
+app = FastAPI(title="SC-RAG", version="0.1.0")
+
+
+@lru_cache(maxsize=1)
+def get_index() -> BM25Index:
+    path = Path(os.getenv("SC_RAG_INDEX", "artifacts/chunks.jsonl"))
+    if not path.exists():
+        raise FileNotFoundError(f"Index is missing: {path}. Run `sc-rag-ingest` first.")
+    return BM25Index.from_jsonl(path)
+
+
+@app.get("/health")
+def health() -> dict[str, object]:
+    try:
+        index = get_index()
+    except (FileNotFoundError, ValueError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    return {"status": "ok", "chunks": len(index.chunks), "retriever": "bm25"}
+
+
+@app.get("/search", response_model=SearchResponse)
+def search(
+    q: str = Query(min_length=2),
+    limit: int = Query(default=8, ge=1, le=20),
+) -> SearchResponse:
+    try:
+        return get_index().search(q, limit)
+    except (FileNotFoundError, ValueError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+

@@ -1,0 +1,15 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Local paper corpus and source benchmark files may be copyrighted or contain answers.
+data/raw/
+data/eval/source/
+
+# Generated indexes, traces, reports, and model caches.
+artifacts/
+.qdrant/
+.cache/
+
