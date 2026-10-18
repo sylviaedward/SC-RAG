@@ -39,6 +39,7 @@ def evaluate(
     any_hits = 0
     all_hits = 0
     latencies_ms: list[float] = []
+    returned_hit_counts: list[int] = []
 
     for item_id, question in questions.items():
         aliases = set(gold[item_id]["gold_aliases"])
@@ -48,6 +49,7 @@ def evaluate(
         response = index.search(str(question["question"]), limit=k)
         latencies_ms.append((time.perf_counter() - started) * 1000)
         retrieved = [hit.alias for hit in response.hits]
+        returned_hit_counts.append(len(retrieved))
         ranks = [rank for rank, alias in enumerate(retrieved, start=1) if alias in aliases]
         any_match = bool(ranks)
         all_match = aliases <= set(retrieved)
@@ -62,6 +64,7 @@ def evaluate(
                 "retrieved_aliases": retrieved,
                 "any_hit": any_match,
                 "all_hit": all_match,
+                "returned_hits": len(retrieved),
             }
         )
         if show_progress and len(rows) % 5 == 0:
@@ -77,6 +80,8 @@ def evaluate(
         "hit_rate_any": round(any_hits / count, 4),
         "hit_rate_all": round(all_hits / count, 4),
         "mrr": round(sum(reciprocal_ranks) / count, 4),
+        "mean_returned_hits": round(sum(returned_hit_counts) / count, 2),
+        "full_k_rate": round(sum(value == k for value in returned_hit_counts) / count, 4),
         "mean_latency_ms": round(sum(latencies_ms) / count, 2),
         "p95_latency_ms": round(ordered_latencies[p95_index], 2),
         "note": "Draft baseline; benchmark gold and page references still require domain review.",

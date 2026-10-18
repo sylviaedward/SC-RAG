@@ -74,9 +74,11 @@ Hit-all@10
 MRR
 mean latency
 p95 latency
+mean returned hits
+full-K rate
 ```
 
-`make evaluate-phase1` 仍可顺序运行两段，但在 Codespaces 中建议先分别执行，便于观察 CPU 和内存。如果精排被系统以 `Error 143` 终止，前三阶段结果仍然安全保留；运行 `free -h` 检查内存，再根据最后一条进度定位。资源较小的 Codespace 可以先执行 `SC_RAG_TORCH_THREADS=1 make evaluate-phase1-reranker RERANK_K=10`，确认链路后再恢复 `RERANK_K=30`。不要只看总分：至少找出 BM25 成功但 Dense 失败、Dense 成功但 BM25 失败、Reranker 改善、Reranker 伤害这四类样本。
+`mean_returned_hits` 和 `full_k_rate` 用于检查多样性过滤后是否仍返回完整 Top-10。`make evaluate-phase1` 可顺序运行两段，但在 Codespaces 中建议先分别执行，便于观察 CPU 和内存。如果精排被系统以 `Error 143` 终止，前三阶段结果仍然安全保留；运行 `free -h` 检查内存，再根据最后一条进度定位。资源较小的 Codespace 可以先执行 `SC_RAG_TORCH_THREADS=1 make evaluate-phase1-reranker RERANK_K=10`，确认链路后再恢复 `RERANK_K=30`。`RERANK_K=10` 只用于链路验证，不能作为正式消融结论。不要只看总分：至少找出 BM25 成功但 Dense 失败、Dense 成功但 BM25 失败、Reranker 改善、Reranker 伤害这四类样本。
 
 ## 2. 工作流和代码对应关系
 

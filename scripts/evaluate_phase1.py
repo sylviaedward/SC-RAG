@@ -71,6 +71,8 @@ def main() -> None:
         "hit_rate_any",
         "hit_rate_all",
         "mrr",
+        "mean_returned_hits",
+        "full_k_rate",
         "mean_latency_ms",
         "p95_latency_ms",
     )
