@@ -8,7 +8,7 @@ RERANK_K ?= 30
 MAX_PER_PAPER ?= 2
 ANSWER_MODE ?= auto
 
-.PHONY: system-deps setup setup-hybrid import-corpus manifest ingest dense-index test search dense-search hybrid-search-rrf hybrid-search answer evaluate evaluate-phase1-core evaluate-phase1-reranker analyze-phase1 evaluate-phase1 evaluate-phase2-unanswerable evaluate-phase2-answerable api
+.PHONY: system-deps setup setup-hybrid import-corpus manifest ingest dense-index test search dense-search hybrid-search-rrf hybrid-search answer evaluate evaluate-phase1-core evaluate-phase1-reranker analyze-phase1 evaluate-phase1 evaluate-phase2-unanswerable evaluate-phase2-answerable analyze-phase2 api
 
 system-deps:
 	@if command -v pdfinfo >/dev/null && command -v pdftotext >/dev/null; then \
@@ -83,6 +83,9 @@ evaluate-phase2-unanswerable:
 
 evaluate-phase2-answerable:
 	$(PYTHON) scripts/evaluate_phase2.py --scope answerable --output artifacts/phase2_answerable_eval.json --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)"
+
+analyze-phase2:
+	$(PYTHON) scripts/analyze_phase2_failures.py
 
 api:
 	$(PYTHON) -m uvicorn sc_rag.api:app --host 0.0.0.0 --port $(PORT)

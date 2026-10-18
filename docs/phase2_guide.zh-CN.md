@@ -94,6 +94,15 @@ make evaluate-phase2-unanswerable
 make evaluate-phase2-answerable
 ```
 
+评测结束后先分析拒答来源，不要立即更换模型：
+
+```bash
+make analyze-phase2
+cat artifacts/phase2_failure_analysis.md
+```
+
+如果 `citation_quote_not_found_in_evidence` 占多数，应调整 quote 生成或规范化；如果 `model_declared_insufficient` 占多数，应检查上下文覆盖和拒答提示；如果结构校验错误占多数，才优先考虑模型的指令遵循能力。报告还会给出只在已回答样本上计算的 conditional citation gold Hit-any/Hit-all，避免把安全拒答和引用精度混成一个指标。
+
 评测逐题写入 JSON，中途发生网络错误时，已完成结果仍会保留。主要指标含义：
 
 - `behavior_accuracy`：可回答题作答、不可回答题拒答的比例；
