@@ -16,10 +16,18 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+hybrid = [
+  "huggingface-hub>=0.34,<1",
+  "numpy>=1.26",
+  "sentence-transformers>=3.4,<4",
+  "transformers>=4.41,<5",
+]
 
 [project.scripts]
 sc-rag-ingest = "sc_rag.ingest:main"
 sc-rag-search = "sc_rag.search:main"
+sc-rag-dense-search = "sc_rag.dense:main"
+sc-rag-hybrid-search = "sc_rag.hybrid:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

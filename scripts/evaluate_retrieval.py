@@ -5,9 +5,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
+from typing import Protocol
 
+from sc_rag.models import SearchResponse
 from sc_rag.search import BM25Index
+
+
+class Retriever(Protocol):
+    name: str
+
+    def search(self, query: str, limit: int = 8) -> SearchResponse: ...
 
 
 def read_jsonl(path: Path) -> list[dict[str, object]]:
@@ -15,19 +24,22 @@ def read_jsonl(path: Path) -> list[dict[str, object]]:
         return [json.loads(line) for line in handle if line.strip()]
 
 
-def evaluate(index: BM25Index, questions_path: Path, gold_path: Path, k: int) -> dict[str, object]:
+def evaluate(index: Retriever, questions_path: Path, gold_path: Path, k: int) -> dict[str, object]:
     questions = {str(item["id"]): item for item in read_jsonl(questions_path)}
     gold = {str(item["id"]): item for item in read_jsonl(gold_path)}
     rows: list[dict[str, object]] = []
     reciprocal_ranks: list[float] = []
     any_hits = 0
     all_hits = 0
+    latencies_ms: list[float] = []
 
     for item_id, question in questions.items():
         aliases = set(gold[item_id]["gold_aliases"])
         if not question["answerable"] or not aliases:
             continue
+        started = time.perf_counter()
         response = index.search(str(question["question"]), limit=k)
+        latencies_ms.append((time.perf_counter() - started) * 1000)
         retrieved = [hit.alias for hit in response.hits]
         ranks = [rank for rank, alias in enumerate(retrieved, start=1) if alias in aliases]
         any_match = bool(ranks)
@@ -47,13 +59,17 @@ def evaluate(index: BM25Index, questions_path: Path, gold_path: Path, k: int) ->
         )
 
     count = len(rows)
+    ordered_latencies = sorted(latencies_ms)
+    p95_index = min(len(ordered_latencies) - 1, int(len(ordered_latencies) * 0.95))
     return {
-        "retriever": "bm25+bilingual_term_expansion",
+        "retriever": index.name,
         "k": k,
         "evaluated_questions": count,
         "hit_rate_any": round(any_hits / count, 4),
         "hit_rate_all": round(all_hits / count, 4),
         "mrr": round(sum(reciprocal_ranks) / count, 4),
+        "mean_latency_ms": round(sum(latencies_ms) / count, 2),
+        "p95_latency_ms": round(ordered_latencies[p95_index], 2),
         "note": "Draft baseline; benchmark gold and page references still require domain review.",
         "results": rows,
     }

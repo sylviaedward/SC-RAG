@@ -134,6 +134,8 @@ curl --get --data-urlencode 'q=低差异序列如何提高随机计算精度？'
 
 ## 三、Phase 1：混合检索
 
+当前阶段的逐步命令、输出字段、实验和代码导读见 [`phase1_guide.zh-CN.md`](phase1_guide.zh-CN.md)。
+
 计划工作流：
 
 ```text

@@ -12,6 +12,8 @@ from .text import expand_query, tokenize
 
 
 class BM25Index:
+    name = "bm25+bilingual_term_expansion"
+
     def __init__(self, chunks: list[Chunk], k1: float = 1.5, b: float = 0.75) -> None:
         if not chunks:
             raise ValueError("Cannot build an index from zero chunks")

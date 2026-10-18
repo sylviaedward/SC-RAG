@@ -15,6 +15,10 @@ class Chunk(BaseModel):
 class SearchHit(Chunk):
     score: float
     rank: int = Field(ge=1)
+    bm25_rank: int | None = None
+    dense_rank: int | None = None
+    rrf_score: float | None = None
+    reranker_score: float | None = None
 
 
 class SearchResponse(BaseModel):

@@ -54,3 +54,4 @@ Python 3.11+ and Poppler (`pdfinfo`, `pdftotext`) are required. `make system-dep
 
 See [the data audit](docs/data_audit.md) for known corpus and benchmark limitations.
 The [completion and learning roadmap](docs/learning_roadmap.md) pairs every implementation phase with concepts, acceptance criteria, and likely interview questions.
+For the current hybrid-retrieval stage, follow the [Phase 1 Chinese operating and code guide](docs/phase1_guide.zh-CN.md).

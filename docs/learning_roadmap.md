@@ -42,7 +42,7 @@ Likely interview questions:
 - Why is an 86% Hit-any score insufficient for cross-paper questions?
 - What is the difference between PDF page number and printed paper page number?
 
-## Phase 1 — Hybrid retrieval
+## Phase 1 — Hybrid retrieval (current)
 
 Build:
 
