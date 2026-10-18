@@ -5,12 +5,19 @@ from functools import lru_cache
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import RedirectResponse
 
 from .models import SearchResponse
 from .search import BM25Index
 
 
 app = FastAPI(title="SC-RAG", version="0.1.0")
+
+
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    """Send browser users to the interactive API documentation."""
+    return RedirectResponse(url="/docs")
 
 
 @lru_cache(maxsize=1)

@@ -55,6 +55,8 @@ curl --get --data-urlencode 'q=低差异序列如何提高随机计算精度？'
   --data 'limit=5' http://127.0.0.1:8000/search
 ```
 
+如果根网址返回 `{"detail":"Not Found"}`，表示运行的是尚未添加根路径跳转的旧版本；直接访问 `/docs` 即可，或拉取最新代码后重启 API。
+
 如果提示 `address already in use`，先运行 `curl http://127.0.0.1:8000/health`。返回 `status: ok` 表示之前启动的 SC-RAG 已经在运行，不需要重复启动；若 8000 是其他服务占用，可执行 `make api PORT=8001`，并在 8001 端口访问 `/docs`。
 
 建议第一次只按上面的顺序执行，不要直接运行某个 `.py` 文件。`Makefile` 是操作入口，具体 Python 文件是随后阅读和调试的对象。评测问题和答案 JSONL 已在 GitHub 中，不需要为了运行基线再次上传原始评测 PDF；只有在研究题库抽取逻辑时才需要把该 PDF 放入 `data/eval/source/`。
