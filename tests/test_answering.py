@@ -1,5 +1,7 @@
 import json
+import io
 import unittest
+import urllib.error
 from typing import Sequence
 from unittest.mock import MagicMock, patch
 
@@ -56,6 +58,28 @@ class GroundedAnswerTests(unittest.TestCase):
         payload = json.loads(request.data)
         self.assertEqual(payload["temperature"], 0)
         self.assertEqual(payload["response_format"], {"type": "json_object"})
+
+    @patch("urllib.request.urlopen")
+    def test_client_retries_400_without_response_format(self, urlopen: MagicMock) -> None:
+        bad_request = urllib.error.HTTPError(
+            "https://llm.example/v1/chat/completions",
+            400,
+            "Bad Request",
+            {},
+            io.BytesIO(b""),
+        )
+        response = MagicMock()
+        response.read.return_value = b'{"choices":[{"message":{"content":"{}"}}]}'
+        response.__enter__.return_value = response
+        urlopen.side_effect = [bad_request, response]
+        client = OpenAICompatibleChatClient("https://llm.example/v1", "secret", "chat-model")
+
+        content = client.complete("system", "user")
+
+        self.assertEqual(content, "{}")
+        self.assertEqual(urlopen.call_count, 2)
+        retry_payload = json.loads(urlopen.call_args.args[0].data)
+        self.assertNotIn("response_format", retry_payload)
 
     def test_builds_citations_from_trusted_retrieval_metadata(self) -> None:
         client = FakeClient(

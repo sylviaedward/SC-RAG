@@ -100,9 +100,9 @@ class OpenAICompatibleChatClient:
     def __init__(self, base_url: str, api_key: str, model_name: str, timeout: float = 90.0) -> None:
         if not base_url or not api_key or not model_name:
             raise ValueError("LLM base URL, API key, and model name are required")
-        self.base_url = base_url.rstrip("/")
-        self.api_key = api_key
-        self.model_name = model_name
+        self.base_url = base_url.strip().rstrip("/")
+        self.api_key = api_key.strip()
+        self.model_name = model_name.strip()
         self.timeout = timeout
 
     @classmethod
@@ -118,37 +118,53 @@ class OpenAICompatibleChatClient:
         return cls("", "", "")
 
     def complete(self, system_prompt: str, user_prompt: str) -> str:
-        payload = json.dumps(
-            {
-                "model": self.model_name,
-                "temperature": 0,
-                "response_format": {"type": "json_object"},
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-            },
-            ensure_ascii=False,
-        ).encode("utf-8")
+        payload = {
+            "model": self.model_name,
+            "temperature": 0,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        }
+        try:
+            return self._post({**payload, "response_format": {"type": "json_object"}})
+        except urllib.error.HTTPError as error:
+            if error.code != 400:
+                self._raise_http_error(error)
+        # Some OpenAI-compatible relays reject response_format. The prompt and
+        # fail-closed parser still require one strict JSON object on this retry.
+        try:
+            return self._post(payload)
+        except urllib.error.HTTPError as error:
+            self._raise_http_error(error)
+
+    def _post(self, payload: dict[str, object]) -> str:
         endpoint = self.base_url if self.base_url.endswith("/chat/completions") else f"{self.base_url}/chat/completions"
         request = urllib.request.Request(
             endpoint,
-            data=payload,
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
             headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
             method="POST",
         )
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 body = json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as error:
-            detail = error.read().decode("utf-8", errors="replace")[:500]
-            raise RuntimeError(f"LLM API returned HTTP {error.code}: {detail}") from error
+        except urllib.error.HTTPError:
+            raise
         except urllib.error.URLError as error:
             raise RuntimeError(f"Could not reach the LLM API: {error.reason}") from error
         try:
             return str(body["choices"][0]["message"]["content"])
         except (KeyError, IndexError, TypeError) as error:
             raise ValueError("LLM API response does not contain message content") from error
+
+    def _raise_http_error(self, error: urllib.error.HTTPError) -> None:
+        detail = error.read().decode("utf-8", errors="replace")[:500].strip()
+        if not detail:
+            detail = str(error.reason or "empty response body")
+        raise RuntimeError(
+            f"LLM API returned HTTP {error.code} for model {self.model_name!r}: {detail}"
+        ) from error
 
 
 def infer_mode(question: str) -> AnswerMode:
