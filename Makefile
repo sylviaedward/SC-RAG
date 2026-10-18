@@ -1,6 +1,13 @@
 PYTHON := .venv/bin/python
 
-.PHONY: setup import-corpus manifest ingest test search evaluate api
+.PHONY: system-deps setup import-corpus manifest ingest test search evaluate api
+
+system-deps:
+	@if command -v pdfinfo >/dev/null && command -v pdftotext >/dev/null; then \
+		echo 'poppler-utils is already installed.'; \
+	else \
+		sudo apt-get update && sudo apt-get install -y poppler-utils; \
+	fi
 
 setup:
 	python3 -m venv .venv
@@ -12,8 +19,8 @@ import-corpus:
 	$(PYTHON) scripts/import_corpus_archives.py $(ARCHIVES)
 
 manifest:
-	@command -v pdfinfo >/dev/null || (echo 'Missing pdfinfo; install poppler-utils first.' && exit 2)
-	@command -v pdftotext >/dev/null || (echo 'Missing pdftotext; install poppler-utils first.' && exit 2)
+	@command -v pdfinfo >/dev/null || (echo 'Missing pdfinfo. Run: make system-deps' && exit 2)
+	@command -v pdftotext >/dev/null || (echo 'Missing pdftotext. Run: make system-deps' && exit 2)
 	$(PYTHON) scripts/build_corpus_manifest.py
 
 ingest:

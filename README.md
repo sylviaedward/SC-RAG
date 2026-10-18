@@ -18,6 +18,7 @@ Raw PDFs, source evaluation documents, generated chunks, and evaluation reports 
 Start with the environment and tests; these do not require the raw papers:
 
 ```bash
+make system-deps
 make setup
 make test
 ```
@@ -39,7 +40,7 @@ make evaluate
 make api
 ```
 
-Python 3.11+ and Poppler (`pdfinfo`, `pdftotext`) are required. See the [Chinese workflow and code guide](docs/workflows.zh-CN.md) for expected outputs, the processing rationale, code locations, debugging exercises, and the readiness gate for each phase.
+Python 3.11+ and Poppler (`pdfinfo`, `pdftotext`) are required. `make system-deps` installs Poppler through `apt` when it is missing. See the [Chinese workflow and code guide](docs/workflows.zh-CN.md) for expected outputs, the processing rationale, code locations, debugging exercises, and the readiness gate for each phase.
 
 ## MVP path
 

@@ -7,11 +7,12 @@
 打开仓库的 Codespace 后，在终端执行：
 
 ```bash
+make system-deps
 make setup
 make test
 ```
 
-这一步不需要论文 PDF。它验证 Python 环境、包安装、50 篇论文元数据、58 道评测题的数据契约和一个小型检索样例。
+`make system-deps` 检查并安装提供 `pdfinfo`、`pdftotext` 的 `poppler-utils`；后两条命令不需要论文 PDF，它们验证 Python 环境、包安装、50 篇论文元数据、58 道评测题的数据契约和一个小型检索样例。
 
 接着创建 `imports/`，把 `SC_Liter1.zip` 到 `SC_Liter4.zip` 拖到 Codespaces 左侧文件区的该目录，然后执行：
 
