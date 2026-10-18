@@ -21,3 +21,4 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual(result.hits[0].chunk_id, "a")
         self.assertEqual(result.hits[0].page, 3)
         self.assertEqual(result.hits[0].rank, 1)
+        self.assertEqual(result.hits[0].bm25_rank, 1)

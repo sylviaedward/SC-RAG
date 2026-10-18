@@ -52,6 +52,8 @@ make hybrid-search QUERY="随机计算中的相关性如何影响乘法器精度
 - `reranker_score`：Cross-Encoder 对问题与 chunk 联合编码后的相关性分数；
 - `rank`：当前阶段的最终名次。
 
+字段按阶段填写，并非每条命令都会填满：纯 BM25 只有 `bm25_rank`，纯 Dense 只有 `dense_rank`，RRF 才有 `rrf_score`，完整 Hybrid 才有 `reranker_score`。在 Hybrid 中，某个 chunk 只被一路召回时，另一路的 rank 仍会是 `null`，这正好用于观察两路召回的互补性。
+
 最后运行完整消融评测：
 
 ```bash

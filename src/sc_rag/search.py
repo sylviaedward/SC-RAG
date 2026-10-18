@@ -57,7 +57,12 @@ class BM25Index:
         scored.sort(key=lambda item: (-item[0], self.chunks[item[1]].chunk_id))
 
         hits = [
-            SearchHit(**self.chunks[item_index].model_dump(), score=round(score, 6), rank=rank)
+            SearchHit(
+                **self.chunks[item_index].model_dump(),
+                score=round(score, 6),
+                rank=rank,
+                bm25_rank=rank,
+            )
             for rank, (score, item_index) in enumerate(scored[:limit], start=1)
         ]
         return SearchResponse(query=query, expanded_query=expanded, hits=hits)
