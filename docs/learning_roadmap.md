@@ -42,7 +42,7 @@ Likely interview questions:
 - Why is an 86% Hit-any score insufficient for cross-paper questions?
 - What is the difference between PDF page number and printed paper page number?
 
-## Phase 1 — Hybrid retrieval (target: 2 days)
+## Phase 1 — Hybrid retrieval
 
 Build:
 
@@ -67,7 +67,7 @@ Likely interview questions:
 - Why rerank only a candidate set instead of the entire corpus?
 - How would you update or delete one paper from the index?
 
-## Phase 2 — Evidence-grounded answering (target: 2 days)
+## Phase 2 — Evidence-grounded answering
 
 Build:
 
@@ -93,7 +93,7 @@ Likely interview questions:
 - How do you prevent a paper from injecting instructions into the system prompt?
 - Why might a stronger LLM fail to improve the final score?
 
-## Phase 3 — Literature review and research ideation (target: 2 days)
+## Phase 3 — Literature review and research ideation
 
 Build:
 
@@ -118,7 +118,7 @@ Likely interview questions:
 - How can the system propose ideas without pretending they are novel?
 - When would a knowledge graph help more than vector retrieval?
 
-## Phase 4 — Evaluation and observability (target: 1–2 days)
+## Phase 4 — Evaluation and observability
 
 Build:
 
@@ -142,7 +142,7 @@ Likely interview questions:
 - Which metric would you optimize first and why?
 - How do you detect regressions after changing chunking or prompts?
 
-## Phase 5 — Product and deployment polish (target: 1–2 days)
+## Phase 5 — Product and deployment polish
 
 Build:
 
@@ -164,13 +164,7 @@ Likely interview questions:
 - How would you control latency and API cost?
 - What production risks remain in the demo?
 
-## Daily allocation for an eight-hour schedule
+## Progression rule
 
-- 1.5 h: read the relevant concept and two or three core files
-- 4 h: implement and debug the current phase
-- 1 h: run evaluation and inspect failures
-- 1 h: explain the design aloud and answer interview questions
-- 0.5 h: update the experiment log, README, and next-day target
-
-The first complete portfolio version should take about 8–10 focused days. Resume writing can begin after Phase 2 because the project will already have a real corpus, measurable retrieval baseline, grounded generation, citations, and abstention. Phases 3–5 turn it into the stronger research-Agent project.
+Progress is based on understanding and acceptance criteria, not calendar days. Stay on the current phase until you can run its workflow, explain the key code path, interpret its metrics, and diagnose representative failures. Then move to the next phase. Resume writing can begin after Phase 2 because the project will already have a real corpus, measurable retrieval baseline, grounded generation, citations, and abstention. Phases 3–5 turn it into the stronger research-Agent project.
 

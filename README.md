@@ -13,44 +13,33 @@ An evidence-grounded literature assistant for stochastic computing (SC). The fir
 
 Raw PDFs, source evaluation documents, generated chunks, and evaluation reports are intentionally ignored by Git.
 
-## Setup
+## Run in GitHub Codespaces
 
-Python 3.11+ and Poppler (`pdfinfo`, `pdftotext`) are required. In this cloud environment, reuse the preinstalled scientific/API packages:
-
-```bash
-cd /workspace/SC-RAG
-python3 -m venv --system-site-packages .venv
-.venv/bin/python -m pip install -e . --no-deps --no-build-isolation
-```
-
-Place the 50 unique PDFs under `data/raw/papers/`, then build and validate the data:
+Start with the environment and tests; these do not require the raw papers:
 
 ```bash
-.venv/bin/python scripts/build_corpus_manifest.py
-.venv/bin/python scripts/extract_eval_benchmark.py data/eval/source/SC_RAG知识库评测题库_题目卷与答案卷.pdf
-.venv/bin/sc-rag-ingest
-.venv/bin/python -m unittest discover -s tests -v
+make setup
+make test
 ```
 
-Search from the command line:
+Create `imports/`, upload the four `SC_Liter*.zip` archives into it, then build the local index:
 
 ```bash
-.venv/bin/sc-rag-search '随机计算中的相关性如何影响乘法器精度？' --limit 5
+mkdir -p imports
+make import-corpus ARCHIVES="imports/SC_Liter*.zip"
+make manifest
+make ingest
 ```
 
-Start the API:
+Run a query, the benchmark, and the API:
 
 ```bash
-.venv/bin/python -m uvicorn sc_rag.api:app --host 0.0.0.0 --port 8000
+make search QUERY="随机计算中的相关性如何影响乘法器精度？"
+make evaluate
+make api
 ```
 
-Check `GET /health` and query `GET /search?q=...&limit=5`.
-
-Run the baseline evaluation:
-
-```bash
-.venv/bin/python scripts/evaluate_retrieval.py --k 10
-```
+Python 3.11+ and Poppler (`pdfinfo`, `pdftotext`) are required. See the [Chinese workflow and code guide](docs/workflows.zh-CN.md) for expected outputs, the processing rationale, code locations, debugging exercises, and the readiness gate for each phase.
 
 ## MVP path
 
