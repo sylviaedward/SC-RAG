@@ -1,4 +1,5 @@
 PYTHON := .venv/bin/python
+PORT ?= 8000
 
 .PHONY: system-deps setup import-corpus manifest ingest test search evaluate api
 
@@ -37,5 +38,5 @@ evaluate:
 	$(PYTHON) scripts/evaluate_retrieval.py --k 10
 
 api:
-	$(PYTHON) -m uvicorn sc_rag.api:app --host 0.0.0.0 --port 8000
+	$(PYTHON) -m uvicorn sc_rag.api:app --host 0.0.0.0 --port $(PORT)
 

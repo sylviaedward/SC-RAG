@@ -40,6 +40,8 @@ make evaluate
 make api
 ```
 
+If port 8000 is already occupied, first check whether SC-RAG is already running with `curl http://127.0.0.1:8000/health`. Otherwise start on another port with `make api PORT=8001`.
+
 Python 3.11+ and Poppler (`pdfinfo`, `pdftotext`) are required. `make system-deps` installs Poppler through `apt` when it is missing. See the [Chinese workflow and code guide](docs/workflows.zh-CN.md) for expected outputs, the processing rationale, code locations, debugging exercises, and the readiness gate for each phase.
 
 ## MVP path
