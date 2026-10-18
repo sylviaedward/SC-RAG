@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Protocol, Sequence
 
@@ -26,10 +27,17 @@ class CrossEncoderReranker:
         except ImportError as error:
             raise RuntimeError("Install Phase 1 dependencies with `make setup-hybrid`.") from error
         self.model_name = model_name
+        import torch
+
+        torch.set_num_threads(int(os.getenv("SC_RAG_TORCH_THREADS", "2")))
         self.model = CrossEncoder(model_name)
 
     def score(self, query: str, passages: Sequence[str]) -> list[float]:
-        values = self.model.predict([(query, passage) for passage in passages], show_progress_bar=False)
+        values = self.model.predict(
+            [(query, passage) for passage in passages],
+            batch_size=8,
+            show_progress_bar=False,
+        )
         return [float(value) for value in values]
 
 

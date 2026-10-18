@@ -4,7 +4,7 @@ EMBEDDING_MODEL ?= intfloat/multilingual-e5-small
 EMBEDDING_PROVIDER ?= local
 RERANKER_MODEL ?= cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
 
-.PHONY: system-deps setup setup-hybrid import-corpus manifest ingest dense-index test search dense-search hybrid-search-rrf hybrid-search evaluate evaluate-phase1 api
+.PHONY: system-deps setup setup-hybrid import-corpus manifest ingest dense-index test search dense-search hybrid-search-rrf hybrid-search evaluate evaluate-phase1-core evaluate-phase1-reranker evaluate-phase1 api
 
 system-deps:
 	@if command -v pdfinfo >/dev/null && command -v pdftotext >/dev/null; then \
@@ -59,8 +59,13 @@ hybrid-search:
 evaluate:
 	$(PYTHON) scripts/evaluate_retrieval.py --k 10
 
-evaluate-phase1:
-	$(PYTHON) scripts/evaluate_phase1.py --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)" --reranker-model "$(RERANKER_MODEL)" --k 10
+evaluate-phase1-core:
+	$(PYTHON) scripts/evaluate_phase1.py --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)" --reranker-model "$(RERANKER_MODEL)" --stages bm25 dense hybrid --output artifacts/phase1_core_eval.json --k 10
+
+evaluate-phase1-reranker:
+	$(PYTHON) scripts/evaluate_phase1.py --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)" --reranker-model "$(RERANKER_MODEL)" --stages reranker --output artifacts/phase1_reranker_eval.json --k 10
+
+evaluate-phase1: evaluate-phase1-core evaluate-phase1-reranker
 
 api:
 	$(PYTHON) -m uvicorn sc_rag.api:app --host 0.0.0.0 --port $(PORT)

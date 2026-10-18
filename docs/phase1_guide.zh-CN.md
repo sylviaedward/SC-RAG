@@ -54,13 +54,19 @@ make hybrid-search QUERY="随机计算中的相关性如何影响乘法器精度
 
 字段按阶段填写，并非每条命令都会填满：纯 BM25 只有 `bm25_rank`，纯 Dense 只有 `dense_rank`，RRF 才有 `rrf_score`，完整 Hybrid 才有 `reranker_score`。在 Hybrid 中，某个 chunk 只被一路召回时，另一路的 rank 仍会是 `null`，这正好用于观察两路召回的互补性。
 
-最后运行完整消融评测：
+先运行无需 Cross-Encoder 的三阶段评测：
 
 ```bash
-make evaluate-phase1
+make evaluate-phase1-core
 ```
 
-它在相同 50 道可回答题上依次评价 BM25、Dense、Hybrid RRF 和 Hybrid Reranked，输出：
+它在相同 50 道可回答题上依次评价 BM25、Dense 和 Hybrid RRF，结果写入 `artifacts/phase1_core_eval.json`。随后单独运行资源消耗更高的精排评测：
+
+```bash
+make evaluate-phase1-reranker
+```
+
+结果写入 `artifacts/phase1_reranker_eval.json`。两段都会每 5 题显示进度，并输出：
 
 ```text
 Hit-any@10
@@ -70,7 +76,7 @@ mean latency
 p95 latency
 ```
 
-完整逐题结果保存在 `artifacts/phase1_eval.json`。不要只看总分：至少找出 BM25 成功但 Dense 失败、Dense 成功但 BM25 失败、Reranker 改善、Reranker 伤害这四类样本。
+`make evaluate-phase1` 仍可顺序运行两段，但在 Codespaces 中建议先分别执行，便于观察 CPU 和内存。如果精排被系统以 `Error 143` 终止，前三阶段结果仍然安全保留；运行 `free -h` 检查内存，再根据最后一条进度定位。不要只看总分：至少找出 BM25 成功但 Dense 失败、Dense 成功但 BM25 失败、Reranker 改善、Reranker 伤害这四类样本。
 
 ## 2. 工作流和代码对应关系
 
@@ -123,7 +129,7 @@ Cross-Encoder 将“问题 + 候选 chunk”一起送入模型，能看到两者
 
 ### 实验 B：候选规模
 
-在 `HybridRetriever.__init__` 中将 `candidate_k` 从 40 改成 10，运行 `make evaluate-phase1`；再恢复成 40。观察召回、延迟和 Reranker 输入数量的关系。
+在 `HybridRetriever.__init__` 中将 `candidate_k` 从 40 改成 10，运行 `make evaluate-phase1-core`；再恢复成 40。观察召回、延迟和 Reranker 输入数量的关系。
 
 ### 实验 C：论文多样性
 

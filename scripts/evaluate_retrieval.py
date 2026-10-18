@@ -24,7 +24,14 @@ def read_jsonl(path: Path) -> list[dict[str, object]]:
         return [json.loads(line) for line in handle if line.strip()]
 
 
-def evaluate(index: Retriever, questions_path: Path, gold_path: Path, k: int) -> dict[str, object]:
+def evaluate(
+    index: Retriever,
+    questions_path: Path,
+    gold_path: Path,
+    k: int,
+    *,
+    show_progress: bool = False,
+) -> dict[str, object]:
     questions = {str(item["id"]): item for item in read_jsonl(questions_path)}
     gold = {str(item["id"]): item for item in read_jsonl(gold_path)}
     rows: list[dict[str, object]] = []
@@ -57,6 +64,8 @@ def evaluate(index: Retriever, questions_path: Path, gold_path: Path, k: int) ->
                 "all_hit": all_match,
             }
         )
+        if show_progress and len(rows) % 5 == 0:
+            print(f"{index.name}: evaluated {len(rows)}/50 questions", flush=True)
 
     count = len(rows)
     ordered_latencies = sorted(latencies_ms)

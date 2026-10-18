@@ -35,7 +35,7 @@ class SentenceTransformerEmbedder:
     def encode(self, texts: Sequence[str], *, show_progress: bool = False) -> np.ndarray:
         vectors = self.model.encode(
             list(texts),
-            batch_size=32,
+            batch_size=16,
             convert_to_numpy=True,
             normalize_embeddings=True,
             show_progress_bar=show_progress,

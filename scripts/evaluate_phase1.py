@@ -24,20 +24,37 @@ def main() -> None:
     parser.add_argument("--embedding-provider", choices=("local", "api"), default="local")
     parser.add_argument("--reranker-model", default=DEFAULT_RERANKER_MODEL)
     parser.add_argument("--k", type=int, default=10)
-    parser.add_argument("--skip-reranker", action="store_true")
+    parser.add_argument(
+        "--stages",
+        nargs="+",
+        choices=("bm25", "dense", "hybrid", "reranker"),
+        default=("bm25", "dense", "hybrid", "reranker"),
+    )
     parser.add_argument("--output", type=Path, default=Path("artifacts/phase1_eval.json"))
     args = parser.parse_args()
 
     embedder = create_embedder(args.embedding_provider, args.embedding_model)
     bm25 = BM25Index.from_jsonl(args.chunks)
     dense = DenseIndex.from_artifacts(args.chunks, args.matrix, args.metadata, embedder)
-    retrievers = [bm25, dense, HybridRetriever(bm25, dense)]
-    if not args.skip_reranker:
-        retrievers.append(HybridRetriever(bm25, dense, reranker=CrossEncoderReranker(args.reranker_model)))
+    retrievers = {
+        "bm25": bm25,
+        "dense": dense,
+        "hybrid": HybridRetriever(bm25, dense),
+    }
+    if "reranker" in args.stages:
+        print("loading cross-encoder reranker...", flush=True)
+        retrievers["reranker"] = HybridRetriever(
+            bm25,
+            dense,
+            reranker=CrossEncoderReranker(args.reranker_model),
+        )
 
-    reports = [evaluate(retriever, args.questions, args.gold, args.k) for retriever in retrievers]
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(reports, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    reports = []
+    for stage in args.stages:
+        print(f"starting stage: {stage}", flush=True)
+        reports.append(evaluate(retrievers[stage], args.questions, args.gold, args.k, show_progress=True))
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(reports, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     summary_keys = (
         "retriever",
         "hit_rate_any",
