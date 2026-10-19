@@ -18,6 +18,10 @@ class Phase2AnalysisTests(unittest.TestCase):
                     "id": "A1",
                     "category": "fundamentals",
                     "status": "answered",
+                    "explicit_target_aliases": ["A"],
+                    "explicit_target_citation_hit_all": True,
+                    "reference_source_hit_any": True,
+                    "reference_source_recall": 1.0,
                     "gold_hit_any": True,
                     "gold_hit_all": True,
                     "response": {"reason": "supported", "evidence_sufficiency": "sufficient"},
@@ -46,7 +50,8 @@ class Phase2AnalysisTests(unittest.TestCase):
 
         analysis = MODULE.analyze(report)
 
-        self.assertEqual(analysis["conditional_citation_gold_hit_any"], 1.0)
+        self.assertEqual(analysis["conditional_reference_source_hit_any"], 1.0)
+        self.assertEqual(analysis["conditional_mean_reference_source_recall"], 1.0)
         self.assertEqual(analysis["reason_counts"]["citation_quote_not_found_in_evidence"], 1)
         self.assertEqual(analysis["reason_counts"]["model_declared_insufficient"], 1)
 
@@ -57,6 +62,10 @@ class Phase2AnalysisTests(unittest.TestCase):
                     "id": "C1",
                     "category": "cross_paper",
                     "status": "partial",
+                    "explicit_target_aliases": ["A", "B"],
+                    "explicit_target_citation_hit_all": False,
+                    "reference_source_hit_any": True,
+                    "reference_source_recall": 0.5,
                     "gold_hit_any": True,
                     "gold_hit_all": False,
                     "response": {"reason": "some dimensions missing", "evidence_sufficiency": "partial"},
@@ -68,7 +77,8 @@ class Phase2AnalysisTests(unittest.TestCase):
 
         self.assertEqual(analysis["accepted_answers"], 1)
         self.assertEqual(analysis["partial_answers"], 1)
-        self.assertEqual(analysis["conditional_citation_gold_hit_any"], 1.0)
+        self.assertEqual(analysis["conditional_reference_source_hit_any"], 1.0)
+        self.assertEqual(analysis["conditional_mean_reference_source_recall"], 0.5)
 
 
 if __name__ == "__main__":

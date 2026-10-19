@@ -8,11 +8,17 @@ import json
 import time
 from pathlib import Path
 
-from sc_rag.answering import GroundedAnswerService, OpenAICompatibleChatClient, build_hybrid_retriever
+from sc_rag.answering import (
+    GroundedAnswerService,
+    OpenAICompatibleChatClient,
+    build_hybrid_retriever,
+    extract_requested_aliases,
+    load_known_aliases,
+)
 from sc_rag.models import AnswerMode, AnswerStatus
 
 
-PROMPT_VERSION = "phase2-grounded-v3-span-citations"
+PROMPT_VERSION = "phase2-grounded-v4-alias-planner"
 
 
 def read_jsonl(path: Path) -> list[dict[str, object]]:
@@ -56,12 +62,14 @@ def main() -> None:
     if not selected:
         raise ValueError("No questions matched the requested scope or IDs")
 
+    known_aliases = load_known_aliases()
     service = GroundedAnswerService(
         build_hybrid_retriever(
             embedding_provider=args.embedding_provider,
             embedding_model=args.embedding_model,
         ),
         OpenAICompatibleChatClient.from_env(),
+        known_aliases=known_aliases,
     )
     rows = []
     latencies = []
@@ -79,7 +87,12 @@ def main() -> None:
                 for citation in claim.citations
             }
         )
-        gold_aliases = set(gold[str(question["id"])]["gold_aliases"]) if expected_answerable else set()
+        cited_alias_set = set(cited_aliases)
+        reference_aliases = set(gold[str(question["id"])]["gold_aliases"]) if expected_answerable else set()
+        explicit_targets = extract_requested_aliases(str(question["question"]), known_aliases)
+        explicit_target_set = set(explicit_targets)
+        evidence_alias_set = set(response.evidence_aliases)
+        reference_hits = reference_aliases & cited_alias_set
         row = {
             "id": question["id"],
             "category": question["category"],
@@ -87,8 +100,29 @@ def main() -> None:
             "status": response.status.value,
             "behavior_correct": usable_response if expected_answerable else response.status == AnswerStatus.abstained,
             "cited_aliases": cited_aliases,
-            "gold_hit_any": bool(gold_aliases & set(cited_aliases)) if expected_answerable else None,
-            "gold_hit_all": gold_aliases <= set(cited_aliases) if expected_answerable else None,
+            "explicit_target_aliases": explicit_targets,
+            "explicit_target_evidence_hit_all": (
+                explicit_target_set <= evidence_alias_set if explicit_target_set else None
+            ),
+            "explicit_target_citation_hit_all": (
+                explicit_target_set <= cited_alias_set if explicit_target_set else None
+            ),
+            "explicit_target_citation_recall": (
+                round(len(explicit_target_set & cited_alias_set) / len(explicit_target_set), 4)
+                if explicit_target_set else None
+            ),
+            "reference_aliases": sorted(reference_aliases),
+            "reference_source_hit_any": bool(reference_hits) if expected_answerable else None,
+            "reference_source_recall": (
+                round(len(reference_hits) / len(reference_aliases), 4)
+                if expected_answerable and reference_aliases else None
+            ),
+            "legacy_reference_source_hit_all": (
+                reference_aliases <= cited_alias_set if expected_answerable else None
+            ),
+            # Retain old row fields so historical analysis tools can read v4 reports.
+            "gold_hit_any": bool(reference_hits) if expected_answerable else None,
+            "gold_hit_all": reference_aliases <= cited_alias_set if expected_answerable else None,
             "latency_ms": round(latency_ms, 2),
             "response": response.model_dump(mode="json"),
         }
@@ -104,6 +138,11 @@ def build_report(scope: str, model: str, rows: list[dict[str, object]], latencie
     answerable = [row for row in rows if row["expected_answerable"]]
     unanswerable = [row for row in rows if not row["expected_answerable"]]
     responded = [row for row in rows if row["status"] in {AnswerStatus.answered.value, AnswerStatus.partial.value}]
+    target_rows = [row for row in answerable if row.get("explicit_target_aliases")]
+    responded_answerable = [
+        row for row in answerable
+        if row["status"] in {AnswerStatus.answered.value, AnswerStatus.partial.value}
+    ]
     return {
         "scope": scope,
         "prompt_version": PROMPT_VERSION,
@@ -123,11 +162,31 @@ def build_report(scope: str, model: str, rows: list[dict[str, object]], latencie
         "abstention_rate_on_unanswerable": round(
             sum(row["status"] == AnswerStatus.abstained.value for row in unanswerable) / len(unanswerable), 4
         ) if unanswerable else None,
-        "citation_gold_hit_any": round(
-            sum(bool(row["gold_hit_any"]) for row in answerable) / len(answerable), 4
+        "explicit_target_question_count": len(target_rows),
+        "explicit_target_evidence_hit_all": round(
+            sum(bool(row["explicit_target_evidence_hit_all"]) for row in target_rows) / len(target_rows), 4
+        ) if target_rows else None,
+        "explicit_target_citation_hit_all": round(
+            sum(bool(row["explicit_target_citation_hit_all"]) for row in target_rows) / len(target_rows), 4
+        ) if target_rows else None,
+        "mean_explicit_target_citation_recall": round(
+            sum(float(row["explicit_target_citation_recall"]) for row in target_rows) / len(target_rows), 4
+        ) if target_rows else None,
+        "reference_source_hit_any": round(
+            sum(bool(row["reference_source_hit_any"]) for row in answerable) / len(answerable), 4
         ) if answerable else None,
-        "citation_gold_hit_all": round(
-            sum(bool(row["gold_hit_all"]) for row in answerable) / len(answerable), 4
+        "mean_reference_source_recall": round(
+            sum(float(row["reference_source_recall"] or 0) for row in answerable) / len(answerable), 4
+        ) if answerable else None,
+        "conditional_reference_source_hit_any": round(
+            sum(bool(row["reference_source_hit_any"]) for row in responded_answerable) / len(responded_answerable), 4
+        ) if responded_answerable else None,
+        "conditional_mean_reference_source_recall": round(
+            sum(float(row["reference_source_recall"] or 0) for row in responded_answerable)
+            / len(responded_answerable), 4
+        ) if responded_answerable else None,
+        "legacy_reference_source_hit_all": round(
+            sum(bool(row["legacy_reference_source_hit_all"]) for row in answerable) / len(answerable), 4
         ) if answerable else None,
         "mean_claims_when_responded": round(
             sum(len(row["response"]["claims"]) for row in responded) / len(responded), 2

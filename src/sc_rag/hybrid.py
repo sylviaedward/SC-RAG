@@ -118,6 +118,10 @@ class HybridRetriever:
         hits = apply_paper_diversity(fused, limit, self.max_per_paper)
         return SearchResponse(query=query, expanded_query=bm25_response.expanded_query, hits=hits)
 
+    def search_alias(self, query: str, alias: str, limit: int = 1) -> SearchResponse:
+        """Provide an exact-paper fallback for the answer evidence planner."""
+        return self.bm25.search_alias(query, alias, limit)
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Hybrid search over the SC corpus")

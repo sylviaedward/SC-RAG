@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import RedirectResponse
 
-from .answering import GroundedAnswerService, OpenAICompatibleChatClient, build_hybrid_retriever
+from .answering import GroundedAnswerService, OpenAICompatibleChatClient, build_hybrid_retriever, load_known_aliases
 from .models import AnswerRequest, AnswerResponse, SearchResponse
 from .search import BM25Index
 
@@ -31,15 +31,17 @@ def get_index() -> BM25Index:
 
 @lru_cache(maxsize=1)
 def get_answer_service() -> GroundedAnswerService:
+    chunks = Path(os.getenv("SC_RAG_INDEX", "artifacts/chunks.jsonl"))
     return GroundedAnswerService(
         build_hybrid_retriever(
-            chunks=Path(os.getenv("SC_RAG_INDEX", "artifacts/chunks.jsonl")),
+            chunks=chunks,
             matrix=Path(os.getenv("SC_RAG_DENSE_MATRIX", "artifacts/dense/embeddings.npy")),
             metadata=Path(os.getenv("SC_RAG_DENSE_METADATA", "artifacts/dense/metadata.json")),
             embedding_provider=os.getenv("SC_RAG_EMBEDDING_PROVIDER", "local"),
             embedding_model=os.getenv("SC_RAG_EMBEDDING_MODEL", "intfloat/multilingual-e5-small"),
         ),
         OpenAICompatibleChatClient.from_env(),
+        known_aliases=load_known_aliases(chunks),
     )
 
 

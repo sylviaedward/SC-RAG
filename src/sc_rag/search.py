@@ -40,10 +40,19 @@ class BM25Index:
         return cls(chunks)
 
     def search(self, query: str, limit: int = 8) -> SearchResponse:
+        return self._search(query, limit)
+
+    def search_alias(self, query: str, alias: str, limit: int = 1) -> SearchResponse:
+        """Rank only chunks belonging to one exact paper alias."""
+        return self._search(query, limit, alias=alias)
+
+    def _search(self, query: str, limit: int, alias: str | None = None) -> SearchResponse:
         expanded = expand_query(query)
         query_terms = Counter(tokenize(expanded))
         scored: list[tuple[float, int]] = []
         for index, frequencies in enumerate(self.term_frequencies):
+            if alias is not None and self.chunks[index].alias != alias:
+                continue
             score = 0.0
             length_norm = self.k1 * (1 - self.b + self.b * self.lengths[index] / self.average_length)
             for term, query_frequency in query_terms.items():

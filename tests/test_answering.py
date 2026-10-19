@@ -10,6 +10,8 @@ from sc_rag.answering import (
     GroundedAnswerService,
     OpenAICompatibleChatClient,
     build_user_prompt,
+    extract_requested_aliases,
+    plan_evidence,
     select_evidence,
     split_evidence_spans,
 )
@@ -22,6 +24,16 @@ class FakeRetriever:
 
     def search(self, query: str, limit: int = 8) -> SearchResponse:
         return SearchResponse(query=query, expanded_query=query, hits=self.hits[:limit])
+
+
+class FakeAliasRetriever(FakeRetriever):
+    def __init__(self, hits: Sequence[SearchHit], alias_hits: dict[str, SearchHit]) -> None:
+        super().__init__(hits)
+        self.alias_hits = alias_hits
+
+    def search_alias(self, query: str, alias: str, limit: int = 1) -> SearchResponse:
+        hits = [self.alias_hits[alias]] if alias in self.alias_hits else []
+        return SearchResponse(query=query, expanded_query=query, hits=hits[:limit])
 
 
 class FakeClient:
@@ -43,7 +55,78 @@ def hit(text: str = "AND gate implements unipolar multiplication.") -> SearchHit
     return SearchHit(**chunk.model_dump(), score=1.0, rank=1, rrf_score=0.03)
 
 
+def alias_hit(alias: str, rank: int) -> SearchHit:
+    chunk = Chunk(
+        chunk_id=f"{alias}:{rank}",
+        paper_id=alias.lower(),
+        alias=alias,
+        title=f"{alias} paper",
+        page=rank,
+        text=f"Evidence from {alias}.",
+    )
+    return SearchHit(**chunk.model_dump(), score=1 / rank, rank=rank, rrf_score=1 / rank)
+
+
 class GroundedAnswerTests(unittest.TestCase):
+    def test_alias_planner_prioritizes_every_explicit_paper(self) -> None:
+        hits = [alias_hit("Noise", 1), alias_hit("Sobol", 2), alias_hit("Other", 3), alias_hit("P2LSG", 4)]
+
+        plan = plan_evidence(
+            "比较 [Sobol] 和 [P2LSG]",
+            hits,
+            ContextBudget(max_chunks=2, max_chars_per_chunk=100, max_total_chars=200),
+            ["Sobol", "P2LSG", "Noise", "Other"],
+        )
+
+        self.assertEqual(plan.requested_aliases, ["Sobol", "P2LSG"])
+        self.assertEqual(plan.evidence_aliases, ["Sobol", "P2LSG"])
+        self.assertEqual(plan.missing_requested_aliases, [])
+
+    def test_alias_extraction_ignores_math_intervals_and_unknown_labels(self) -> None:
+        aliases = extract_requested_aliases("范围 [0, 1]，参见 [Sobol] 和 [Unknown]", ["Sobol"])
+
+        self.assertEqual(aliases, ["Sobol"])
+
+    def test_alias_planner_reports_requested_paper_missing_from_candidates(self) -> None:
+        plan = plan_evidence(
+            "比较 [Sobol] 和 [P2LSG]",
+            [alias_hit("Sobol", 1)],
+            ContextBudget(max_chunks=2, max_chars_per_chunk=100, max_total_chars=200),
+            ["Sobol", "P2LSG"],
+        )
+
+        self.assertEqual(plan.evidence_aliases, ["Sobol"])
+        self.assertEqual(plan.missing_requested_aliases, ["P2LSG"])
+
+    def test_service_fetches_missing_explicit_alias_before_planning(self) -> None:
+        client = FakeClient(
+            {
+                "evidence_sufficiency": "sufficient",
+                "confidence": 0.9,
+                "claims": [
+                    {"text": "Sobol evidence", "citations": [{"span_id": "E1.S1"}]},
+                    {"text": "P2LSG evidence", "citations": [{"span_id": "E2.S1"}]},
+                ],
+                "missing_information": [],
+                "reason": "Both requested papers are supported.",
+            }
+        )
+        retriever = FakeAliasRetriever(
+            [alias_hit("Sobol", 1)],
+            {"P2LSG": alias_hit("P2LSG", 2)},
+        )
+
+        response = GroundedAnswerService(
+            retriever,
+            client,
+            known_aliases=["Sobol", "P2LSG"],
+        ).answer("比较 [Sobol] 和 [P2LSG]")
+
+        self.assertEqual(response.status, AnswerStatus.answered)
+        self.assertEqual(response.requested_aliases, ["Sobol", "P2LSG"])
+        self.assertEqual(response.evidence_aliases, ["Sobol", "P2LSG"])
+        self.assertEqual(response.missing_requested_aliases, [])
+
     @patch("urllib.request.urlopen")
     def test_openai_compatible_client_requests_json_output(self, urlopen: MagicMock) -> None:
         response = MagicMock()
@@ -105,6 +188,8 @@ class GroundedAnswerTests(unittest.TestCase):
         self.assertEqual(response.claims[0].citations[0].chunk_id, "paper-1:p5:c0")
         self.assertEqual(response.claims[0].citations[0].excerpt, "AND gate implements unipolar multiplication.")
         self.assertIn("[Survey, PDF p.5]", response.answer)
+        self.assertEqual(response.candidate_chunks, 1)
+        self.assertEqual(response.evidence_aliases, ["Survey"])
 
     def test_unknown_citation_fails_closed(self) -> None:
         client = FakeClient(

@@ -81,5 +81,9 @@ class AnswerResponse(BaseModel):
     reason: str
     missing_information: list[str] = Field(default_factory=list)
     retrieved_chunks: int = Field(ge=0)
+    candidate_chunks: int = Field(default=0, ge=0)
+    evidence_aliases: list[str] = Field(default_factory=list)
+    requested_aliases: list[str] = Field(default_factory=list)
+    missing_requested_aliases: list[str] = Field(default_factory=list)
     model: str
 

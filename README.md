@@ -58,4 +58,4 @@ Python 3.11+ and Poppler (`pdfinfo`, `pdftotext`) are required. `make system-dep
 
 See [the data audit](docs/data_audit.md) for known corpus and benchmark limitations.
 The [completion and learning roadmap](docs/learning_roadmap.md) pairs every implementation phase with concepts, acceptance criteria, and likely interview questions.
-For retrieval experiments, follow the [Phase 1 Chinese guide](docs/phase1_guide.zh-CN.md). For grounded answers, citation validation, and abstention evaluation, follow the [Phase 2 Chinese guide](docs/phase2_guide.zh-CN.md).
+For retrieval experiments, follow the [Phase 1 Chinese guide](docs/phase1_guide.zh-CN.md). For alias-aware evidence planning, grounded answers, citation validation, and abstention evaluation, follow the [Phase 2 Chinese guide](docs/phase2_guide.zh-CN.md).

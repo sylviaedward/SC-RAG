@@ -6,8 +6,11 @@ Phase 2 的目标不是“让 LLM 看起来会回答”，而是让系统只交�
 
 ```text
 问题 + 回答模式
-  -> Hybrid RRF 检索 Top-10
-  -> 上下文预算裁剪（最多 10 chunks / 14000 字符）
+  -> Hybrid RRF 检索候选池 Top-30
+  -> 从问题正文解析已知的 [论文别名]
+  -> 对候选池缺失的显式别名执行 exact-alias BM25 补召回
+  -> alias-aware evidence planner 优先为每个显式别名保留至少一个 chunk
+  -> 再按原检索顺序填充证据（最多 10 chunks / 14000 字符）
   -> 应用层把 chunk 切为 E1.S1 等可信证据 span
   -> 将论文内容标记为不可信数据
   -> OpenAI-compatible Chat Completions
@@ -91,6 +94,17 @@ make evaluate-phase2-unanswerable
 
 确认拒答行为后，再运行 50 道可回答题：
 
+先对检索失败较多的 9 题运行 v4 回归，观察 planner trace：
+
+```bash
+.venv/bin/python scripts/evaluate_phase2.py \
+  --scope answerable \
+  --ids A6 A9 C2 C4 C9 C10 D1 D2 D8 \
+  --output artifacts/phase2_v4_regression.json
+```
+
+确认 `response.requested_aliases`、`response.evidence_aliases` 和 `response.missing_requested_aliases` 符合预期后，再运行全量：
+
 ```bash
 make evaluate-phase2-answerable
 ```
@@ -102,7 +116,7 @@ make analyze-phase2
 cat artifacts/phase2_failure_analysis.md
 ```
 
-`phase2-grounded-v3-span-citations` 不再要求模型逐字复制 quote；旧版 `citation_quote_not_found_in_evidence` 仅用于分析历史报告。如果新版出现 `claim_referenced_unknown_span`，说明模型编造了 span ID；如果 `model_declared_insufficient` 占多数，应检查上下文覆盖和拒答提示。报告还会给出只在已回答样本上计算的 conditional citation gold Hit-any/Hit-all，避免把安全拒答和引用精度混成一个指标。
+`phase2-grounded-v4-alias-planner` 沿用可信 span 引用，并在证据裁剪前处理显式论文别名。别名只来自问题正文和语料 manifest；规划器不读取答案卷或 `gold_aliases`。旧版 `citation_quote_not_found_in_evidence` 仅用于分析历史报告。如果新版出现 `claim_referenced_unknown_span`，说明模型编造了 span ID；如果 `explicit_target_evidence_hit_all` 低，先检查候选池召回；如果证据目标全覆盖但引用目标未全覆盖，再检查生成 Prompt。
 
 若最终引用覆盖低于检索指标，运行跨阶段归因：
 
@@ -111,7 +125,7 @@ make attribute-phase2
 cat artifacts/phase2_attribution.md
 ```
 
-该报告将 Phase 1 的逐题 Hybrid Top-10 与 Phase 2 最终引用连接起来：`retrieval_incomplete` 表示 gold 论文没有全部进入上下文，应改进召回或证据规划；`generation_omitted_retrieved_gold` 表示证据已进入上下文但模型漏引，应调整生成覆盖约束。不要在归因前同时修改检索和 Prompt。
+v4 报告直接记录本次回答实际使用的 `evidence_aliases`，归因脚本优先使用该 trace，而不是拿 Phase 1 Top-10 近似上下文。`explicit_target_missing_from_evidence` 表示问题点名的论文没有进入最终证据；`generation_omitted_explicit_target` 表示证据已进入上下文但模型没有引用。对没有显式论文目标的基础题，参考答案来源只用于计算 Hit-any 和平均 recall。
 
 如果报告中的中文别名显示为 `ç»Ľčż°` 一类字符，先区分数据损坏与查看器编码错误。`make test` 会逐条校验生成 chunk 的 paper ID、alias 和 title 是否与 UTF-8 manifest 完全一致。测试通过时数据没有发生该类乱码转换，应把编辑器或终端文件编码切换为 UTF-8；测试失败时重新运行 `make ingest` 和 `make dense-index`，再重跑 Phase 1/2 报告。
 
@@ -120,11 +134,14 @@ cat artifacts/phase2_attribution.md
 - `behavior_accuracy`：可回答题给出完整或部分证据回答、不可回答题拒答的比例；
 - `full_answer_rate_on_answerable`、`partial_answer_rate_on_answerable`：区分完整回答和明确披露缺失项的部分回答；
 - `abstention_rate_on_unanswerable`：八道语料外问题的拒答率；
-- `citation_gold_hit_any/all`：最终 claim 引用是否覆盖 gold 论文；
+- `explicit_target_evidence_hit_all`：问题中 `[论文别名]` 是否全部进入实际上下文；
+- `explicit_target_citation_hit_all`、`mean_explicit_target_citation_recall`：显式目标是否全部被引用，以及平均覆盖比例；
+- `reference_source_hit_any`、`mean_reference_source_recall`：最终引用对答案卷参考来源的命中与平均覆盖，作为弱监督质量信号；
+- `legacy_reference_source_hit_all`：是否引用答案卷列出的全部来源，只保留作历史诊断，不作为 Phase 2 准入门槛；
 - `mean_claims_when_responded`：完整和部分回答中的平均原子 claim 数；
 - `mean_latency_ms`：检索、生成和校验的端到端平均延迟。
 
-这里的 gold alias 指标验证引用论文是否正确，不等价于答案事实完全正确。Phase 4 会进一步加入原子答案评分。span ID 保证展示的摘录一定来自检索证据，也不能单独证明该摘录在语义上完整支持 claim；需要在失败分析中人工抽查。
+答案卷中的参考来源可能互相替代，也可能只是举例集合，因此不能把“全部参考来源都被引用”当成每题硬要求。显式目标来自用户问题，适合衡量跨论文任务是否完整执行；参考来源指标验证引用方向是否合理。两者都不等价于答案事实完全正确。Phase 4 会进一步加入原子答案评分。span ID 保证展示的摘录一定来自检索证据，也不能单独证明该摘录在语义上完整支持 claim；需要在失败分析中人工抽查。
 
 ## 5. 代码工作流
 
@@ -132,7 +149,10 @@ cat artifacts/phase2_attribution.md
 |---|---|---|
 | API 适配 | `OpenAICompatibleChatClient` | 中转 API 和 DeepSeek 共用同一接口，密钥只从环境读取 |
 | 模式判断 | `infer_mode` | 不同任务需要不同的回答组织约束 |
-| 上下文预算 | `select_evidence` | 控制 token、延迟和无关证据数量 |
+| 显式目标解析 | `extract_requested_aliases` | 只接受语料中存在的方括号别名，避免把 `[0, 1]` 当论文 |
+| 定向补召回 | `BM25Index.search_alias`、`HybridRetriever.search_alias` | 处理 `Sobol`/`PSobol` 等名称碰撞，保证规划器有目标论文候选 |
+| 证据规划 | `plan_evidence` | 跨论文问题先覆盖每个显式目标，再填充高分证据 |
+| 上下文预算 | `select_evidence` | 在目标覆盖后控制 token、延迟和无关证据数量 |
 | 防提示注入 | `SYSTEM_PROMPT`、`build_user_prompt` | 明确把论文文本当作不可信数据而非指令 |
 | 输出合同 | `RawAnswer`、`RawClaim` | 禁止自由格式输出绕过引用检查 |
 | 证据切片 | `split_evidence_spans` | 为原文分配受信任的 `E1.S1` 等 ID，避免模型复制原文造成格式误杀 |
@@ -170,4 +190,6 @@ curl -X POST http://127.0.0.1:8002/answer \
 4. 为什么不可回答题必须与可回答题分开评测；
 5. 为什么 API 网络错误应抛出服务错误，而模型坏输出应安全拒答；
 6. 上下文过多如何同时影响费用、延迟和忠实度。
+
+本轮 v4 回归通过以下条件后即可结束 Phase 2：可回答题 usable response rate 不低于 0.90；显式目标进入证据的 Hit-all 不低于 0.90；显式目标引用 Hit-all 不低于 0.85；已回答样本的 reference-source Hit-any 不低于 0.85；8 道不可回答题拒答率不低于 0.875；未知 span 或其他伪造引用被接受的数量为 0。`legacy_reference_source_hit_all` 只用于观察，不阻塞进入 Phase 3。
 

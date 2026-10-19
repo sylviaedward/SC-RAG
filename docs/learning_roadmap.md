@@ -76,6 +76,7 @@ Build:
 - structured output containing answer, claim-level citations, confidence, and evidence sufficiency
 - explicit abstention when evidence is missing or contradictory
 - context-budget controls and prompt-injection-resistant document wrapping
+- alias-aware evidence planning for questions that explicitly name one or more papers
 
 Acceptance criteria:
 
@@ -83,6 +84,7 @@ Acceptance criteria:
 - the eight unanswerable questions are evaluated separately
 - unsupported citations and malformed model output fail closed
 - API keys remain environment variables and never enter Git or logs
+- explicit paper targets and optional reference sources are scored separately; reference-source Hit-all is diagnostic only
 
 You should understand grounding versus factual correctness, structured outputs, citation verification, context-window budgeting, temperature, retries, timeouts, and why retrieval confidence alone is not enough for abstention.
 

@@ -40,9 +40,7 @@ def reason_code(row: dict[str, object]) -> str:
 def analyze(report: dict[str, object]) -> dict[str, object]:
     rows = report["results"]
     reasons = Counter(reason_code(row) for row in rows)
-    categories: dict[str, dict[str, int]] = defaultdict(
-        lambda: {"questions": 0, "answered": 0, "gold_hit_any": 0, "gold_hit_all": 0}
-    )
+    categories: dict[str, Counter[str]] = defaultdict(Counter)
     failures: dict[str, list[str]] = defaultdict(list)
     accepted_rows = []
     for row in rows:
@@ -51,8 +49,17 @@ def analyze(report: dict[str, object]) -> dict[str, object]:
         bucket["questions"] += 1
         if row["status"] in {"answered", "partial"}:
             bucket["answered"] += 1
-            bucket["gold_hit_any"] += int(bool(row["gold_hit_any"]))
-            bucket["gold_hit_all"] += int(bool(row["gold_hit_all"]))
+            targets = row.get("explicit_target_aliases", [])
+            if targets:
+                bucket["explicit_target_questions"] += 1
+                bucket["explicit_target_all"] += int(bool(row.get("explicit_target_citation_hit_all")))
+            bucket["reference_hit_any"] += int(
+                bool(row.get("reference_source_hit_any", row.get("gold_hit_any")))
+            )
+            recall = row.get("reference_source_recall")
+            if recall is None:
+                recall = float(bool(row.get("gold_hit_all")))
+            bucket["reference_recall_sum"] += float(recall)
             accepted_rows.append(row)
         else:
             failures[reason_code(row)].append(str(row["id"]))
@@ -62,11 +69,17 @@ def analyze(report: dict[str, object]) -> dict[str, object]:
         "accepted_answers": len(accepted_rows),
         "full_answers": sum(row["status"] == "answered" for row in accepted_rows),
         "partial_answers": sum(row["status"] == "partial" for row in accepted_rows),
-        "conditional_citation_gold_hit_any": round(
-            sum(bool(row["gold_hit_any"]) for row in accepted_rows) / len(accepted_rows), 4
+        "conditional_reference_source_hit_any": round(
+            sum(bool(row.get("reference_source_hit_any", row.get("gold_hit_any"))) for row in accepted_rows)
+            / len(accepted_rows), 4
         ) if accepted_rows else None,
-        "conditional_citation_gold_hit_all": round(
-            sum(bool(row["gold_hit_all"]) for row in accepted_rows) / len(accepted_rows), 4
+        "conditional_mean_reference_source_recall": round(
+            sum(
+                float(row["reference_source_recall"])
+                if row.get("reference_source_recall") is not None
+                else float(bool(row.get("gold_hit_all")))
+                for row in accepted_rows
+            ) / len(accepted_rows), 4
         ) if accepted_rows else None,
         "reason_counts": dict(reasons.most_common()),
         "categories": dict(sorted(categories.items())),
@@ -80,8 +93,8 @@ def render_markdown(analysis: dict[str, object]) -> str:
         "",
         f"Accepted {analysis['accepted_answers']} of {analysis['evaluated_questions']} answers.",
         f"Full answers: {analysis['full_answers']}; partial answers: {analysis['partial_answers']}.",
-        f"Conditional citation gold Hit-any: {analysis['conditional_citation_gold_hit_any']}",
-        f"Conditional citation gold Hit-all: {analysis['conditional_citation_gold_hit_all']}",
+        f"Conditional reference-source Hit-any: {analysis['conditional_reference_source_hit_any']}",
+        f"Conditional mean reference-source recall: {analysis['conditional_mean_reference_source_recall']}",
         "",
         "## Outcome reasons",
         "",
@@ -95,14 +108,16 @@ def render_markdown(analysis: dict[str, object]) -> str:
             "",
             "## Category breakdown",
             "",
-            "| Category | Questions | Answered | Gold any | Gold all |",
-            "|---|---:|---:|---:|---:|",
+            "| Category | Questions | Answered | Explicit targets all | Reference any | Mean reference recall |",
+            "|---|---:|---:|---:|---:|---:|",
         ]
     )
     for category, values in analysis["categories"].items():
         lines.append(
             f"| {category} | {values['questions']} | {values['answered']} | "
-            f"{values['gold_hit_any']} | {values['gold_hit_all']} |"
+            f"{values['explicit_target_all']}/{values['explicit_target_questions']} | "
+            f"{values['reference_hit_any']} | "
+            f"{round(values['reference_recall_sum'] / values['answered'], 4) if values['answered'] else None} |"
         )
     lines.extend(["", "## Failed question IDs", ""])
     for reason, ids in analysis["failure_ids"].items():

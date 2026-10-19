@@ -22,3 +22,13 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual(result.hits[0].page, 3)
         self.assertEqual(result.hits[0].rank, 1)
         self.assertEqual(result.hits[0].bm25_rank, 1)
+
+    def test_alias_search_filters_colliding_paper_names(self) -> None:
+        chunks = [
+            Chunk(chunk_id="a", paper_id="p1", alias="Sobol", title="Sobol", page=1, text="baseline sequence"),
+            Chunk(chunk_id="b", paper_id="p2", alias="PSobol", title="Parallel Sobol", page=1, text="parallel sequence"),
+        ]
+
+        result = BM25Index(chunks).search_alias("比较 [Sobol] 和 [PSobol]", "Sobol")
+
+        self.assertEqual([item.alias for item in result.hits], ["Sobol"])
