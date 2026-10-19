@@ -125,15 +125,24 @@ class OpenAICompatibleChatClient:
 
     @classmethod
     def from_env(cls) -> "OpenAICompatibleChatClient":
-        groups = (
-            (os.getenv("SC_RAG_LLM_BASE_URL", ""), os.getenv("SC_RAG_LLM_API_KEY", ""), os.getenv("SC_RAG_LLM_MODEL", "")),
-            (os.getenv("OPENAI_BASE_URL", ""), os.getenv("OPENAI_API_KEY", ""), os.getenv("OPENAI_MODEL_ID", "")),
-            (os.getenv("DEEPSEEK_BASE_URL", ""), os.getenv("DEEPSEEK_API_KEY", ""), os.getenv("DEEPSEEK_MODEL_ID", "")),
+        definitions = (
+            ("SC_RAG_LLM", ("SC_RAG_LLM_BASE_URL", "SC_RAG_LLM_API_KEY", "SC_RAG_LLM_MODEL")),
+            ("OPENAI", ("OPENAI_BASE_URL", "OPENAI_API_KEY", "OPENAI_MODEL_ID")),
+            ("DEEPSEEK", ("DEEPSEEK_BASE_URL", "DEEPSEEK_API_KEY", "DEEPSEEK_MODEL_ID")),
         )
-        for group in groups:
-            if any(group):
-                return cls(*group)
-        return cls("", "", "")
+        incomplete: list[str] = []
+        for label, names in definitions:
+            values = tuple(os.getenv(name, "").strip() for name in names)
+            present = [name for name, value in zip(names, values) if value]
+            if len(present) == len(names):
+                return cls(*values)
+            if present:
+                missing = [name for name, value in zip(names, values) if not value]
+                incomplete.append(f"{label} missing {', '.join(missing)}")
+        detail = "; ".join(incomplete) or "no supported variable group is set"
+        raise ValueError(
+            "LLM configuration requires one complete group of base URL, API key, and model name; " + detail
+        )
 
     def complete(self, system_prompt: str, user_prompt: str) -> str:
         payload = {
