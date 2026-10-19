@@ -15,6 +15,7 @@ Phase 2 的目标不是“让 LLM 看起来会回答”，而是让系统只交�
   -> 将论文内容标记为不可信数据
   -> OpenAI-compatible Chat Completions
   -> 严格 JSON 解析
+  -> JSON/schema 失败或漏引已提供的显式目标时，执行最多一次定向修复
   -> span ID 白名单校验
   -> 应用层从 span ID 取回原文摘录
   -> 应用层绑定 alias、chunk ID、PDF 页码
@@ -94,13 +95,13 @@ make evaluate-phase2-unanswerable
 
 确认拒答行为后，再运行 50 道可回答题：
 
-先对检索失败较多的 9 题运行 v4 回归，观察 planner trace：
+先对检索失败较多的 9 题运行当前回归，观察 planner 与 repair trace：
 
 ```bash
 .venv/bin/python scripts/evaluate_phase2.py \
   --scope answerable \
   --ids A6 A9 C2 C4 C9 C10 D1 D2 D8 \
-  --output artifacts/phase2_v4_regression.json
+  --output artifacts/phase2_v5_regression.json
 ```
 
 确认 `response.requested_aliases`、`response.evidence_aliases` 和 `response.missing_requested_aliases` 符合预期后，再运行全量：
@@ -116,7 +117,7 @@ make analyze-phase2
 cat artifacts/phase2_failure_analysis.md
 ```
 
-`phase2-grounded-v4-alias-planner` 沿用可信 span 引用，并在证据裁剪前处理显式论文别名。别名只来自问题正文和语料 manifest；规划器不读取答案卷或 `gold_aliases`。旧版 `citation_quote_not_found_in_evidence` 仅用于分析历史报告。如果新版出现 `claim_referenced_unknown_span`，说明模型编造了 span ID；如果 `explicit_target_evidence_hit_all` 低，先检查候选池召回；如果证据目标全覆盖但引用目标未全覆盖，再检查生成 Prompt。
+`phase2-grounded-v5-validator-repair` 沿用可信 span 引用与 alias planner，并增加一次有界生成修复。别名只来自问题正文和语料 manifest；规划器不读取答案卷或 `gold_aliases`。旧版 `citation_quote_not_found_in_evidence` 仅用于分析历史报告。如果新版出现 `claim_referenced_unknown_span`，说明模型编造了 span ID；如果 `explicit_target_evidence_hit_all` 低，先检查候选池召回；如果证据目标全覆盖但引用目标未全覆盖，再检查 repair trace 和生成 Prompt。
 
 若最终引用覆盖低于检索指标，运行跨阶段归因：
 
@@ -125,7 +126,9 @@ make attribute-phase2
 cat artifacts/phase2_attribution.md
 ```
 
-v4 报告直接记录本次回答实际使用的 `evidence_aliases`，归因脚本优先使用该 trace，而不是拿 Phase 1 Top-10 近似上下文。`explicit_target_missing_from_evidence` 表示问题点名的论文没有进入最终证据；`generation_omitted_explicit_target` 表示证据已进入上下文但模型没有引用。对没有显式论文目标的基础题，参考答案来源只用于计算 Hit-any 和平均 recall。
+当前报告直接记录本次回答实际使用的 `evidence_aliases`，归因脚本优先使用该 trace，而不是拿 Phase 1 Top-10 近似上下文。`explicit_target_missing_from_evidence` 表示问题点名的论文没有进入最终证据；`generation_omitted_explicit_target` 表示经过修复后仍有目标论文未被引用。对没有显式论文目标的基础题，参考答案来源只用于计算 Hit-any 和平均 recall。
+
+生成修复是一个最多两次调用的有界循环。第一次输出发生 JSON/Pydantic 校验错误，或漏引已经进入证据的显式目标时，系统会把错误类型交给模型修复一次。响应中的 `generation_attempts` 和 `repair_reason` 记录该过程；`generation_repair_success_rate` 衡量触发修复后最终得到完整或部分回答的比例。未知 span 仍由应用层 fail-closed。参考答案来源不会进入修复 Prompt，避免 gold 泄漏。
 
 如果报告中的中文别名显示为 `ç»Ľčż°` 一类字符，先区分数据损坏与查看器编码错误。`make test` 会逐条校验生成 chunk 的 paper ID、alias 和 title 是否与 UTF-8 manifest 完全一致。测试通过时数据没有发生该类乱码转换，应把编辑器或终端文件编码切换为 UTF-8；测试失败时重新运行 `make ingest` 和 `make dense-index`，再重跑 Phase 1/2 报告。
 
@@ -138,6 +141,7 @@ v4 报告直接记录本次回答实际使用的 `evidence_aliases`，归因脚�
 - `explicit_target_citation_hit_all`、`mean_explicit_target_citation_recall`：显式目标是否全部被引用，以及平均覆盖比例；
 - `reference_source_hit_any`、`mean_reference_source_recall`：最终引用对答案卷参考来源的命中与平均覆盖，作为弱监督质量信号；
 - `legacy_reference_source_hit_all`：是否引用答案卷列出的全部来源，只保留作历史诊断，不作为 Phase 2 准入门槛；
+- `generation_repair_rate`、`generation_repair_success_rate`：生成修复触发比例与修复后的可用响应率；
 - `mean_claims_when_responded`：完整和部分回答中的平均原子 claim 数；
 - `mean_latency_ms`：检索、生成和校验的端到端平均延迟。
 

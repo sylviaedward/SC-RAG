@@ -50,6 +50,20 @@ class FakeClient:
         return self.output if isinstance(self.output, str) else json.dumps(self.output)
 
 
+class SequencedFakeClient(FakeClient):
+    def __init__(self, outputs: list[object]) -> None:
+        super().__init__(outputs[0])
+        self.outputs = outputs
+        self.calls = 0
+
+    def complete(self, system_prompt: str, user_prompt: str) -> str:
+        self.system_prompt = system_prompt
+        self.user_prompt = user_prompt
+        output = self.outputs[min(self.calls, len(self.outputs) - 1)]
+        self.calls += 1
+        return output if isinstance(output, str) else json.dumps(output)
+
+
 def hit(text: str = "AND gate implements unipolar multiplication.") -> SearchHit:
     chunk = Chunk(chunk_id="paper-1:p5:c0", paper_id="paper-1", alias="Survey", title="SC Survey", page=5, text=text)
     return SearchHit(**chunk.model_dump(), score=1.0, rank=1, rrf_score=0.03)
@@ -126,6 +140,54 @@ class GroundedAnswerTests(unittest.TestCase):
         self.assertEqual(response.requested_aliases, ["Sobol", "P2LSG"])
         self.assertEqual(response.evidence_aliases, ["Sobol", "P2LSG"])
         self.assertEqual(response.missing_requested_aliases, [])
+
+    def test_repairs_one_omitted_explicit_target(self) -> None:
+        first = {
+            "evidence_sufficiency": "sufficient",
+            "confidence": 0.8,
+            "claims": [{"text": "Sobol evidence", "citations": [{"span_id": "E1.S1"}]}],
+            "missing_information": [],
+            "reason": "incomplete comparison",
+        }
+        repaired = {
+            "evidence_sufficiency": "sufficient",
+            "confidence": 0.9,
+            "claims": [
+                {"text": "Sobol evidence", "citations": [{"span_id": "E1.S1"}]},
+                {"text": "P2LSG evidence", "citations": [{"span_id": "E2.S1"}]},
+            ],
+            "missing_information": [],
+            "reason": "complete comparison",
+        }
+        client = SequencedFakeClient([first, repaired])
+
+        response = GroundedAnswerService(
+            FakeRetriever([alias_hit("Sobol", 1), alias_hit("P2LSG", 2)]),
+            client,
+            known_aliases=["Sobol", "P2LSG"],
+        ).answer("比较 [Sobol] 和 [P2LSG]")
+
+        self.assertEqual(response.status, AnswerStatus.answered)
+        self.assertEqual(response.generation_attempts, 2)
+        self.assertEqual(response.repair_reason, "explicit_target_not_cited:P2LSG")
+        self.assertEqual({citation.alias for claim in response.claims for citation in claim.citations}, {"Sobol", "P2LSG"})
+        self.assertIn("explicit_target_not_cited:P2LSG", client.user_prompt)
+
+    def test_repairs_malformed_json_once(self) -> None:
+        repaired = {
+            "evidence_sufficiency": "sufficient",
+            "confidence": 0.9,
+            "claims": [{"text": "supported", "citations": [{"span_id": "E1.S1"}]}],
+            "missing_information": [],
+            "reason": "valid after repair",
+        }
+        client = SequencedFakeClient(["not json", repaired])
+
+        response = GroundedAnswerService(FakeRetriever([hit()]), client).answer("question")
+
+        self.assertEqual(response.status, AnswerStatus.answered)
+        self.assertEqual(response.generation_attempts, 2)
+        self.assertTrue(response.repair_reason.startswith("json:"))
 
     @patch("urllib.request.urlopen")
     def test_openai_compatible_client_requests_json_output(self, urlopen: MagicMock) -> None:

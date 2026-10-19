@@ -24,7 +24,11 @@ class Phase2EvaluationTests(unittest.TestCase):
                 "reference_source_hit_any": True,
                 "reference_source_recall": 0.25,
                 "legacy_reference_source_hit_all": False,
-                "response": {"claims": [{"text": "supported"}]},
+                "response": {
+                    "claims": [{"text": "supported"}],
+                    "generation_attempts": 2,
+                    "repair_reason": "explicit_target_not_cited:B",
+                },
             },
             {
                 "expected_answerable": True,
@@ -49,6 +53,8 @@ class Phase2EvaluationTests(unittest.TestCase):
         self.assertEqual(report["mean_explicit_target_citation_recall"], 0.5)
         self.assertEqual(report["mean_reference_source_recall"], 0.625)
         self.assertEqual(report["legacy_reference_source_hit_all"], 0.5)
+        self.assertEqual(report["generation_repair_rate"], 0.5)
+        self.assertEqual(report["generation_repair_success_rate"], 1.0)
 
 
 if __name__ == "__main__":

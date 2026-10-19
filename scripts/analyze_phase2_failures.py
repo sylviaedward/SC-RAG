@@ -40,6 +40,11 @@ def reason_code(row: dict[str, object]) -> str:
 def analyze(report: dict[str, object]) -> dict[str, object]:
     rows = report["results"]
     reasons = Counter(reason_code(row) for row in rows)
+    repairs = Counter(
+        str(row["response"].get("repair_reason"))
+        for row in rows
+        if row["response"].get("repair_reason")
+    )
     categories: dict[str, Counter[str]] = defaultdict(Counter)
     failures: dict[str, list[str]] = defaultdict(list)
     accepted_rows = []
@@ -82,6 +87,7 @@ def analyze(report: dict[str, object]) -> dict[str, object]:
             ) / len(accepted_rows), 4
         ) if accepted_rows else None,
         "reason_counts": dict(reasons.most_common()),
+        "repair_counts": dict(repairs.most_common()),
         "categories": dict(sorted(categories.items())),
         "failure_ids": dict(sorted(failures.items())),
     }
@@ -102,6 +108,9 @@ def render_markdown(analysis: dict[str, object]) -> str:
         "|---|---:|",
     ]
     for reason, count in analysis["reason_counts"].items():
+        lines.append(f"| {reason} | {count} |")
+    lines.extend(["", "## Generation repairs", "", "| Repair trigger | Count |", "|---|---:|"])
+    for reason, count in analysis["repair_counts"].items():
         lines.append(f"| {reason} | {count} |")
     lines.extend(
         [

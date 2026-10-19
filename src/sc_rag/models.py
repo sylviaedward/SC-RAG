@@ -85,5 +85,7 @@ class AnswerResponse(BaseModel):
     evidence_aliases: list[str] = Field(default_factory=list)
     requested_aliases: list[str] = Field(default_factory=list)
     missing_requested_aliases: list[str] = Field(default_factory=list)
+    generation_attempts: int = Field(default=1, ge=0)
+    repair_reason: str | None = None
     model: str
 

@@ -18,7 +18,7 @@ from sc_rag.answering import (
 from sc_rag.models import AnswerMode, AnswerStatus
 
 
-PROMPT_VERSION = "phase2-grounded-v4-alias-planner"
+PROMPT_VERSION = "phase2-grounded-v5-validator-repair"
 
 
 def read_jsonl(path: Path) -> list[dict[str, object]]:
@@ -143,6 +143,7 @@ def build_report(scope: str, model: str, rows: list[dict[str, object]], latencie
         row for row in answerable
         if row["status"] in {AnswerStatus.answered.value, AnswerStatus.partial.value}
     ]
+    repaired = [row for row in rows if int(row["response"].get("generation_attempts", 1)) > 1]
     return {
         "scope": scope,
         "prompt_version": PROMPT_VERSION,
@@ -188,6 +189,11 @@ def build_report(scope: str, model: str, rows: list[dict[str, object]], latencie
         "legacy_reference_source_hit_all": round(
             sum(bool(row["legacy_reference_source_hit_all"]) for row in answerable) / len(answerable), 4
         ) if answerable else None,
+        "generation_repair_rate": round(len(repaired) / len(rows), 4),
+        "generation_repair_success_rate": round(
+            sum(row["status"] in {AnswerStatus.answered.value, AnswerStatus.partial.value} for row in repaired)
+            / len(repaired), 4
+        ) if repaired else None,
         "mean_claims_when_responded": round(
             sum(len(row["response"]["claims"]) for row in responded) / len(responded), 2
         ) if responded else 0,

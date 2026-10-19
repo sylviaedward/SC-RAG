@@ -60,7 +60,7 @@ def attribute(retrieval_report: dict[str, object], answer_report: dict[str, obje
         elif status == "abstained":
             cause = "generation_abstained_with_reference_evidence"
         elif not reference_citation_hits:
-            cause = "generation_omitted_reference_source"
+            cause = "reference_source_not_cited"
         else:
             cause = "reference_source_covered"
 
@@ -86,6 +86,7 @@ def attribute(retrieval_report: dict[str, object], answer_report: dict[str, obje
                 "reference_aliases": sorted(reference),
                 "missing_all_reference_evidence": not bool(reference_evidence_hits),
                 "cited_reference_aliases": sorted(reference_citation_hits),
+                "cited_non_reference_aliases": sorted(cited - reference),
             }
         )
 
@@ -159,7 +160,8 @@ def render_markdown(analysis: dict[str, object]) -> str:
         lines.append(
             f"- `{row['id']}` `{row['cause']}`: missing targets from evidence="
             f"{row['missing_targets_from_evidence']}; evidence targets not cited="
-            f"{row['evidence_targets_not_cited']}"
+            f"{row['evidence_targets_not_cited']}; cited non-reference sources="
+            f"{row['cited_non_reference_aliases']}"
         )
     return "\n".join(lines) + "\n"
 
