@@ -50,6 +50,51 @@ class Phase2AttributionTests(unittest.TestCase):
         self.assertEqual(analysis["explicit_target_evidence_hit_all"], 0.6667)
         self.assertEqual(analysis["explicit_target_citation_hit_all"], 0.3333)
 
+    def test_prints_complete_reference_source_review_case(self) -> None:
+        retrieval = {
+            "retriever": "hybrid_rrf",
+            "results": [{"id": "A1", "gold_aliases": ["Survey"], "retrieved_aliases": ["Survey", "Textbook"]}],
+        }
+        answers = {
+            "prompt_version": "v5",
+            "results": [
+                {
+                    "id": "A1",
+                    "category": "fundamentals",
+                    "status": "answered",
+                    "cited_aliases": ["Textbook"],
+                    "explicit_target_aliases": [],
+                    "reference_aliases": ["Survey"],
+                    "response": {
+                        "question": "什么是随机计算？",
+                        "evidence_aliases": ["Survey", "Textbook"],
+                        "claims": [
+                            {
+                                "text": "随机计算使用位流表示数值。",
+                                "citations": [
+                                    {
+                                        "alias": "Textbook",
+                                        "span_id": "E2.S1",
+                                        "page": 4,
+                                        "chunk_id": "textbook:p4:c0",
+                                    }
+                                ],
+                            }
+                        ],
+                    },
+                }
+            ],
+        }
+
+        analysis = MODULE.attribute(retrieval, answers)
+        case = analysis["reference_source_review_cases"][0]
+
+        self.assertEqual(case["question"], "什么是随机计算？")
+        self.assertEqual(case["gold_aliases"], ["Survey"])
+        self.assertEqual(case["actual_cited_aliases"], ["Textbook"])
+        self.assertEqual(case["claims"][0]["cited_aliases"], ["Textbook"])
+        self.assertIn("随机计算使用位流表示数值。", MODULE.render_markdown(analysis))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -128,6 +128,14 @@ cat artifacts/phase2_attribution.md
 
 当前报告直接记录本次回答实际使用的 `evidence_aliases`，归因脚本优先使用该 trace，而不是拿 Phase 1 Top-10 近似上下文。`explicit_target_missing_from_evidence` 表示问题点名的论文没有进入最终证据；`generation_omitted_explicit_target` 表示经过修复后仍有目标论文未被引用。对没有显式论文目标的基础题，参考答案来源只用于计算 Hit-any 和平均 recall。
 
+对于 `reference_source_not_cited`，先打印人工审核材料，不应直接修改运行时 Prompt：
+
+```bash
+make review-phase2-references PHASE2_REPORT=artifacts/phase2_answerable_eval.json
+```
+
+终端和 `artifacts/phase2_attribution.md` 会列出问题原文、答案卷的全部 gold aliases、模型的每条 claim，以及每条 claim 对应的 alias、span、页码和 chunk ID。若替代引用在语义上确实支持 claim，应修订 benchmark 的可接受来源集合或评测口径，而不是强迫模型引用某篇指定论文。
+
 生成修复是一个最多两次调用的有界循环。第一次输出发生 JSON/Pydantic 校验错误，或漏引已经进入证据的显式目标时，系统会把错误类型交给模型修复一次。响应中的 `generation_attempts` 和 `repair_reason` 记录该过程；`generation_repair_success_rate` 衡量触发修复后最终得到完整或部分回答的比例。未知 span 仍由应用层 fail-closed。参考答案来源不会进入修复 Prompt，避免 gold 泄漏。
 
 如果报告中的中文别名显示为 `ç»Ľčż°` 一类字符，先区分数据损坏与查看器编码错误。`make test` 会逐条校验生成 chunk 的 paper ID、alias 和 title 是否与 UTF-8 manifest 完全一致。测试通过时数据没有发生该类乱码转换，应把编辑器或终端文件编码切换为 UTF-8；测试失败时重新运行 `make ingest` 和 `make dense-index`，再重跑 Phase 1/2 报告。

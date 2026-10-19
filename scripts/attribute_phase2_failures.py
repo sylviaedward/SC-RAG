@@ -19,6 +19,30 @@ def load_retriever_report(path: Path, retriever: str) -> dict[str, object]:
     raise ValueError(f"{retriever!r} not found in {path}; available: {available}")
 
 
+def claim_review(response: dict[str, object]) -> list[dict[str, object]]:
+    reviews = []
+    for claim in response.get("claims", []):
+        citations = [
+            {
+                "alias": citation.get("alias"),
+                "span_id": citation.get("span_id"),
+                "page": citation.get("page"),
+                "chunk_id": citation.get("chunk_id"),
+            }
+            for citation in claim.get("citations", [])
+        ]
+        reviews.append(
+            {
+                "text": claim.get("text", ""),
+                "cited_aliases": sorted(
+                    {str(citation["alias"]) for citation in citations if citation["alias"]}
+                ),
+                "citations": citations,
+            }
+        )
+    return reviews
+
+
 def attribute(retrieval_report: dict[str, object], answer_report: dict[str, object]) -> dict[str, object]:
     """Use v4's actual evidence plan, with Phase 1 Top-K as a legacy fallback."""
     retrieval_rows = {str(row["id"]): row for row in retrieval_report["results"]}
@@ -80,6 +104,7 @@ def attribute(retrieval_report: dict[str, object], answer_report: dict[str, obje
                 "category": category,
                 "status": status,
                 "cause": cause,
+                "question": response.get("question", answer_row.get("question", "")),
                 "explicit_target_aliases": sorted(targets),
                 "missing_targets_from_evidence": sorted(targets - evidence),
                 "evidence_targets_not_cited": sorted((targets & evidence) - cited),
@@ -87,11 +112,24 @@ def attribute(retrieval_report: dict[str, object], answer_report: dict[str, obje
                 "missing_all_reference_evidence": not bool(reference_evidence_hits),
                 "cited_reference_aliases": sorted(reference_citation_hits),
                 "cited_non_reference_aliases": sorted(cited - reference),
+                "claims": claim_review(response),
             }
         )
 
     count = len(rows)
     target_rows = [row for row in rows if row["explicit_target_aliases"]]
+    review_cases = [
+        {
+            "id": row["id"],
+            "category": row["category"],
+            "question": row["question"],
+            "gold_aliases": row["reference_aliases"],
+            "actual_cited_aliases": row["cited_non_reference_aliases"],
+            "claims": row["claims"],
+        }
+        for row in rows
+        if row["cause"] == "reference_source_not_cited"
+    ]
     return {
         "question_count": count,
         "evidence_source": "phase2_alias_planner" if used_planner_trace else retrieval_report["retriever"],
@@ -114,6 +152,7 @@ def attribute(retrieval_report: dict[str, object], answer_report: dict[str, obje
         ),
         "cause_counts": dict(causes.most_common()),
         "categories": {category: dict(values) for category, values in sorted(categories.items())},
+        "reference_source_review_cases": review_cases,
         "results": rows,
     }
 
@@ -163,6 +202,33 @@ def render_markdown(analysis: dict[str, object]) -> str:
             f"{row['evidence_targets_not_cited']}; cited non-reference sources="
             f"{row['cited_non_reference_aliases']}"
         )
+    lines.extend(["", "## Reference-source manual review", ""])
+    if not analysis["reference_source_review_cases"]:
+        lines.append("No `reference_source_not_cited` cases.")
+    for case in analysis["reference_source_review_cases"]:
+        lines.extend(
+            [
+                f"### {case['id']} ({case['category']})",
+                "",
+                f"**Question:** {case['question']}",
+                "",
+                f"**Gold aliases:** `{json.dumps(case['gold_aliases'], ensure_ascii=False)}`",
+                "",
+                f"**Actual cited aliases:** `{json.dumps(case['actual_cited_aliases'], ensure_ascii=False)}`",
+                "",
+                "**Claims:**",
+                "",
+            ]
+        )
+        for index, claim in enumerate(case["claims"], start=1):
+            lines.append(f"{index}. {claim['text']}")
+            lines.append(f"   - Aliases: `{json.dumps(claim['cited_aliases'], ensure_ascii=False)}`")
+            for citation in claim["citations"]:
+                lines.append(
+                    f"   - Citation: alias=`{citation['alias']}`, span=`{citation['span_id']}`, "
+                    f"page=`{citation['page']}`, chunk=`{citation['chunk_id']}`"
+                )
+        lines.append("")
     return "\n".join(lines) + "\n"
 
 
@@ -171,13 +237,19 @@ def main() -> None:
     parser.add_argument("--retrieval", type=Path, default=Path("artifacts/phase1_core_eval.json"))
     parser.add_argument("--phase2", type=Path, default=Path("artifacts/phase2_answerable_eval.json"))
     parser.add_argument("--output", type=Path, default=Path("artifacts/phase2_attribution.md"))
+    parser.add_argument("--review-only", action="store_true")
     args = parser.parse_args()
     retrieval = load_retriever_report(args.retrieval, "hybrid_rrf")
     answers = json.loads(args.phase2.read_text(encoding="utf-8"))
     analysis = attribute(retrieval, answers)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(render_markdown(analysis), encoding="utf-8")
-    print(json.dumps({key: value for key, value in analysis.items() if key != "results"}, ensure_ascii=False, indent=2))
+    console_output = (
+        analysis["reference_source_review_cases"]
+        if args.review_only
+        else {key: value for key, value in analysis.items() if key != "results"}
+    )
+    print(json.dumps(console_output, ensure_ascii=False, indent=2))
     print(f"wrote {args.output}")
 
 
