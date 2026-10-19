@@ -1,6 +1,6 @@
 # Phase 2：证据约束回答操作与代码导读
 
-Phase 2 的目标不是“让 LLM 看起来会回答”，而是让系统只交付能追溯到检索 chunk 和 PDF 页码的 claim，并在证据不足、引用伪造或输出损坏时拒答。
+Phase 2 的目标不是“让 LLM 看起来会回答”，而是让系统只交付能追溯到检索 chunk、证据 span 和 PDF 页码的 claim，并在证据不足、引用伪造或输出损坏时拒答。
 
 ## 1. 当前最小闭环
 
@@ -8,11 +8,12 @@ Phase 2 的目标不是“让 LLM 看起来会回答”，而是让系统只交�
 问题 + 回答模式
   -> Hybrid RRF 检索 Top-10
   -> 上下文预算裁剪（最多 10 chunks / 14000 字符）
+  -> 应用层把 chunk 切为 E1.S1 等可信证据 span
   -> 将论文内容标记为不可信数据
   -> OpenAI-compatible Chat Completions
   -> 严格 JSON 解析
-  -> evidence ID 白名单校验
-  -> 支持性原文摘录校验
+  -> span ID 白名单校验
+  -> 应用层从 span ID 取回原文摘录
   -> 应用层绑定 alias、chunk ID、PDF 页码
   -> 完整回答、带缺失项的部分回答，或显式拒答
 ```
@@ -70,7 +71,7 @@ make answer \
   ANSWER_MODE=paper_lookup
 ```
 
-第一个结果应为 `status: answered` 或 `partial`，并在每个 claim 下包含真实的 `chunk_id`、论文别名和 PDF 页码。`partial` 只保留有证据的 claim，并在 `missing_information` 中明确尚无证据的子问题。第二个结果应为 `status: abstained`。如果模型输出了不存在的 evidence ID，或给出的 quote 无法在对应 chunk 中找到，系统也会返回 `abstained`，并在 `reason` 中说明校验失败原因。
+第一个结果应为 `status: answered` 或 `partial`，并在每个 claim 下包含真实的 `span_id`、`chunk_id`、论文别名、PDF 页码和由系统取回的原文摘录。`partial` 只保留有证据的 claim，并在 `missing_information` 中明确尚无证据的子问题。第二个结果应为 `status: abstained`。如果模型输出不存在的 span ID，系统会返回 `abstained`，并在 `reason` 中说明校验失败原因。
 
 ## 4. 运行 Phase 2 评测
 
@@ -101,7 +102,7 @@ make analyze-phase2
 cat artifacts/phase2_failure_analysis.md
 ```
 
-如果 `citation_quote_not_found_in_evidence` 占多数，应调整 quote 生成或规范化；如果 `model_declared_insufficient` 占多数，应检查上下文覆盖和拒答提示；如果结构校验错误占多数，才优先考虑模型的指令遵循能力。报告还会给出只在已回答样本上计算的 conditional citation gold Hit-any/Hit-all，避免把安全拒答和引用精度混成一个指标。
+`phase2-grounded-v3-span-citations` 不再要求模型逐字复制 quote；旧版 `citation_quote_not_found_in_evidence` 仅用于分析历史报告。如果新版出现 `claim_referenced_unknown_span`，说明模型编造了 span ID；如果 `model_declared_insufficient` 占多数，应检查上下文覆盖和拒答提示。报告还会给出只在已回答样本上计算的 conditional citation gold Hit-any/Hit-all，避免把安全拒答和引用精度混成一个指标。
 
 评测逐题写入 JSON，中途发生网络错误时，已完成结果仍会保留。主要指标含义：
 
@@ -112,7 +113,7 @@ cat artifacts/phase2_failure_analysis.md
 - `mean_claims_when_responded`：完整和部分回答中的平均原子 claim 数；
 - `mean_latency_ms`：检索、生成和校验的端到端平均延迟。
 
-这里的 gold alias 指标验证引用论文是否正确，不等价于答案事实完全正确。Phase 4 会进一步加入原子答案评分。当前的 quote 校验确保引用文本真实存在，也不能单独证明摘录在语义上完整支持 claim；需要在失败分析中人工抽查。
+这里的 gold alias 指标验证引用论文是否正确，不等价于答案事实完全正确。Phase 4 会进一步加入原子答案评分。span ID 保证展示的摘录一定来自检索证据，也不能单独证明该摘录在语义上完整支持 claim；需要在失败分析中人工抽查。
 
 ## 5. 代码工作流
 
@@ -123,9 +124,10 @@ cat artifacts/phase2_failure_analysis.md
 | 上下文预算 | `select_evidence` | 控制 token、延迟和无关证据数量 |
 | 防提示注入 | `SYSTEM_PROMPT`、`build_user_prompt` | 明确把论文文本当作不可信数据而非指令 |
 | 输出合同 | `RawAnswer`、`RawClaim` | 禁止自由格式输出绕过引用检查 |
-| 引用验证 | `GroundedAnswerService.answer` | evidence ID 必须来自本次检索，quote 必须存在于该 chunk |
+| 证据切片 | `split_evidence_spans` | 为原文分配受信任的 `E1.S1` 等 ID，避免模型复制原文造成格式误杀 |
+| 引用验证 | `GroundedAnswerService.answer` | span ID 必须来自本次 Prompt，原文摘录由应用层取回 |
 | 可信元数据绑定 | `Citation` | 页码、论文 ID 由应用生成，不能由模型编造 |
-| 拒答 | `abstention` | 缺证据、坏 JSON、未知引用、伪造 quote 都采用 fail-closed |
+| 拒答 | `abstention` | 缺证据、坏 JSON和未知 span 都采用 fail-closed |
 | 离线评测 | `scripts/evaluate_phase2.py` | gold 只在模型回答后用于评分，避免泄漏 |
 | HTTP 接口 | `POST /answer` | 将同一服务提供给后续 UI 和部署阶段 |
 
@@ -153,7 +155,7 @@ curl -X POST http://127.0.0.1:8002/answer \
 
 1. 为什么检索命中正确论文仍不等于答案有依据；
 2. 为什么页码和 chunk ID 必须由应用层绑定；
-3. 为什么 quote 存在性校验比只校验 `E1` 更强，但仍不等于语义蕴含；
+3. 为什么让模型引用可信 span ID 比要求它逐字复制 quote 更稳定，以及为什么 span 有效仍不等于语义蕴含；
 4. 为什么不可回答题必须与可回答题分开评测；
 5. 为什么 API 网络错误应抛出服务错误，而模型坏输出应安全拒答；
 6. 上下文过多如何同时影响费用、延迟和忠实度。

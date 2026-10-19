@@ -11,7 +11,7 @@ An evidence-grounded literature assistant for stochastic computing (SC). It inge
 - Search API returning paper title, benchmark alias, PDF page, score, and source text
 - Retrieval evaluation using gold paper aliases
 - BM25 + multilingual dense retrieval with reciprocal-rank fusion
-- OpenAI-compatible grounded generation with exact-quote citation checks
+- OpenAI-compatible grounded generation with application-resolved evidence-span citations
 - Explicit abstention for missing evidence or invalid model output
 
 Raw PDFs, source evaluation documents, generated chunks, and evaluation reports are intentionally ignored by Git.

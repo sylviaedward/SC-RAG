@@ -12,7 +12,7 @@ from sc_rag.answering import GroundedAnswerService, OpenAICompatibleChatClient, 
 from sc_rag.models import AnswerMode, AnswerStatus
 
 
-PROMPT_VERSION = "phase2-grounded-v2-partial"
+PROMPT_VERSION = "phase2-grounded-v3-span-citations"
 
 
 def read_jsonl(path: Path) -> list[dict[str, object]]:

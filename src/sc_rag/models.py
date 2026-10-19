@@ -56,6 +56,7 @@ class AnswerRequest(BaseModel):
 
 class Citation(BaseModel):
     evidence_id: str
+    span_id: str
     chunk_id: str
     paper_id: str
     alias: str

@@ -14,6 +14,7 @@ VALIDATION_REASONS = {
     "supported_output_contained_no_claims",
     "claim_contained_duplicate_citations",
     "claim_referenced_unknown_evidence",
+    "claim_referenced_unknown_span",
     "citation_quote_not_found_in_evidence",
     "partial_output_contained_no_missing_information",
     "sufficient_output_contained_missing_information",
