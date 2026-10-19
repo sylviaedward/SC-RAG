@@ -40,6 +40,21 @@ class DataContractTests(unittest.TestCase):
         gold = read_jsonl("data/eval/gold_answers.jsonl")
         self.assertTrue(all(set(answer["gold_aliases"]) <= aliases for answer in gold))
 
+    def test_generated_chunk_identity_matches_utf8_manifest(self) -> None:
+        chunks_path = ROOT / "artifacts/chunks.jsonl"
+        if not chunks_path.exists():
+            self.skipTest("Generated chunks are not present")
+        papers = {str(paper["paper_id"]): paper for paper in read_jsonl("data/metadata/papers.jsonl")}
+        chunks = read_jsonl("artifacts/chunks.jsonl")
+        mismatches = [
+            chunk["chunk_id"]
+            for chunk in chunks
+            if chunk["paper_id"] not in papers
+            or chunk["alias"] != papers[str(chunk["paper_id"])]["alias"]
+            or chunk["title"] != papers[str(chunk["paper_id"])]["title"]
+        ]
+        self.assertEqual(mismatches[:10], [], "Chunk aliases/titles differ from the UTF-8 manifest; rebuild indexes")
+
     def test_extraction_does_not_capture_document_notes(self) -> None:
         gold = read_jsonl("data/eval/gold_answers.jsonl")
         self.assertTrue(all("审核与冻结建议" not in str(answer["answer"]) for answer in gold))

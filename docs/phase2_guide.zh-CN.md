@@ -113,6 +113,8 @@ cat artifacts/phase2_attribution.md
 
 该报告将 Phase 1 的逐题 Hybrid Top-10 与 Phase 2 最终引用连接起来：`retrieval_incomplete` 表示 gold 论文没有全部进入上下文，应改进召回或证据规划；`generation_omitted_retrieved_gold` 表示证据已进入上下文但模型漏引，应调整生成覆盖约束。不要在归因前同时修改检索和 Prompt。
 
+如果报告中的中文别名显示为 `ç»Ľčż°` 一类字符，先区分数据损坏与查看器编码错误。`make test` 会逐条校验生成 chunk 的 paper ID、alias 和 title 是否与 UTF-8 manifest 完全一致。测试通过时数据没有发生该类乱码转换，应把编辑器或终端文件编码切换为 UTF-8；测试失败时重新运行 `make ingest` 和 `make dense-index`，再重跑 Phase 1/2 报告。
+
 评测逐题写入 JSON，中途发生网络错误时，已完成结果仍会保留。主要指标含义：
 
 - `behavior_accuracy`：可回答题给出完整或部分证据回答、不可回答题拒答的比例；
