@@ -22,6 +22,7 @@ hybrid = [
   "sentence-transformers>=3.4,<4",
   "transformers>=4.41,<5",
 ]
+ui = ["streamlit>=1.36"]
 
 [project.scripts]
 sc-rag-ingest = "sc_rag.ingest:main"
