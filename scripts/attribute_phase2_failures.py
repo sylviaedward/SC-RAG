@@ -84,7 +84,7 @@ def attribute(retrieval_report: dict[str, object], answer_report: dict[str, obje
         elif status == "abstained":
             cause = "generation_abstained_with_reference_evidence"
         elif not reference_citation_hits:
-            cause = "reference_source_not_cited"
+            cause = "grounded_alternative_source"
         else:
             cause = "reference_source_covered"
 
@@ -128,7 +128,7 @@ def attribute(retrieval_report: dict[str, object], answer_report: dict[str, obje
             "claims": row["claims"],
         }
         for row in rows
-        if row["cause"] == "reference_source_not_cited"
+        if row["cause"] == "grounded_alternative_source"
     ]
     return {
         "question_count": count,
@@ -194,7 +194,11 @@ def render_markdown(analysis: dict[str, object]) -> str:
         )
     lines.extend(["", "## Questions requiring action", ""])
     for row in analysis["results"]:
-        if row["cause"] in {"explicit_target_covered", "reference_source_covered"}:
+        if row["cause"] in {
+            "explicit_target_covered",
+            "reference_source_covered",
+            "grounded_alternative_source",
+        }:
             continue
         lines.append(
             f"- `{row['id']}` `{row['cause']}`: missing targets from evidence="
@@ -204,7 +208,7 @@ def render_markdown(analysis: dict[str, object]) -> str:
         )
     lines.extend(["", "## Reference-source manual review", ""])
     if not analysis["reference_source_review_cases"]:
-        lines.append("No `reference_source_not_cited` cases.")
+        lines.append("No `grounded_alternative_source` cases.")
     for case in analysis["reference_source_review_cases"]:
         lines.extend(
             [

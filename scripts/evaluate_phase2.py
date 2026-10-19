@@ -93,12 +93,21 @@ def main() -> None:
         explicit_target_set = set(explicit_targets)
         evidence_alias_set = set(response.evidence_aliases)
         reference_hits = reference_aliases & cited_alias_set
+        citation_contract_valid = bool(response.claims) and all(
+            claim.citations
+            and all(
+                citation.span_id and citation.chunk_id and citation.alias and citation.excerpt
+                for citation in claim.citations
+            )
+            for claim in response.claims
+        ) if usable_response else None
         row = {
             "id": question["id"],
             "category": question["category"],
             "expected_answerable": expected_answerable,
             "status": response.status.value,
             "behavior_correct": usable_response if expected_answerable else response.status == AnswerStatus.abstained,
+            "citation_contract_valid": citation_contract_valid,
             "cited_aliases": cited_aliases,
             "explicit_target_aliases": explicit_targets,
             "explicit_target_evidence_hit_all": (
@@ -189,6 +198,15 @@ def build_report(scope: str, model: str, rows: list[dict[str, object]], latencie
         "legacy_reference_source_hit_all": round(
             sum(bool(row["legacy_reference_source_hit_all"]) for row in answerable) / len(answerable), 4
         ) if answerable else None,
+        "grounded_response_rate_on_answerable": round(
+            sum(bool(row.get("citation_contract_valid", row["status"] in {"answered", "partial"})) for row in answerable)
+            / len(answerable), 4
+        ) if answerable else None,
+        "accepted_citation_contract_violations": sum(
+            row["status"] in {AnswerStatus.answered.value, AnswerStatus.partial.value}
+            and not bool(row.get("citation_contract_valid", True))
+            for row in answerable
+        ),
         "generation_repair_rate": round(len(repaired) / len(rows), 4),
         "generation_repair_success_rate": round(
             sum(row["status"] in {AnswerStatus.answered.value, AnswerStatus.partial.value} for row in repaired)

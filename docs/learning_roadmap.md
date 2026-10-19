@@ -85,6 +85,7 @@ Acceptance criteria:
 - unsupported citations and malformed model output fail closed
 - API keys remain environment variables and never enter Git or logs
 - explicit paper targets and optional reference sources are scored separately; reference-source Hit-all is diagnostic only
+- a single readiness command gates Phase 3 on the complete 50-answerable/8-unanswerable benchmark
 
 You should understand grounding versus factual correctness, structured outputs, citation verification, context-window budgeting, temperature, retries, timeouts, and why retrieval confidence alone is not enough for abstention.
 

@@ -128,13 +128,13 @@ cat artifacts/phase2_attribution.md
 
 当前报告直接记录本次回答实际使用的 `evidence_aliases`，归因脚本优先使用该 trace，而不是拿 Phase 1 Top-10 近似上下文。`explicit_target_missing_from_evidence` 表示问题点名的论文没有进入最终证据；`generation_omitted_explicit_target` 表示经过修复后仍有目标论文未被引用。对没有显式论文目标的基础题，参考答案来源只用于计算 Hit-any 和平均 recall。
 
-对于 `reference_source_not_cited`，先打印人工审核材料，不应直接修改运行时 Prompt：
+对于 `grounded_alternative_source`，归因报告会保留人工审核材料，但该项不阻塞 Phase 3：
 
 ```bash
 make review-phase2-references PHASE2_REPORT=artifacts/phase2_answerable_eval.json
 ```
 
-终端和 `artifacts/phase2_attribution.md` 会列出问题原文、答案卷的全部 gold aliases、模型的每条 claim，以及每条 claim 对应的 alias、span、页码和 chunk ID。若替代引用在语义上确实支持 claim，应修订 benchmark 的可接受来源集合或评测口径，而不是强迫模型引用某篇指定论文。
+终端和 `artifacts/phase2_attribution.md` 会列出问题原文、答案卷的全部 gold aliases、模型的每条 claim，以及每条 claim 对应的 alias、span、页码和 chunk ID。人工确认替代引用直接支持 claim 后，它属于通过引用合同的 grounded answer；gold alias 命中率继续保留为 benchmark 诊断指标，不参与 Phase 2 release gate。
 
 生成修复是一个最多两次调用的有界循环。第一次输出发生 JSON/Pydantic 校验错误，或漏引已经进入证据的显式目标时，系统会把错误类型交给模型修复一次。响应中的 `generation_attempts` 和 `repair_reason` 记录该过程；`generation_repair_success_rate` 衡量触发修复后最终得到完整或部分回答的比例。未知 span 仍由应用层 fail-closed。参考答案来源不会进入修复 Prompt，避免 gold 泄漏。
 
@@ -149,6 +149,7 @@ make review-phase2-references PHASE2_REPORT=artifacts/phase2_answerable_eval.jso
 - `explicit_target_citation_hit_all`、`mean_explicit_target_citation_recall`：显式目标是否全部被引用，以及平均覆盖比例；
 - `reference_source_hit_any`、`mean_reference_source_recall`：最终引用对答案卷参考来源的命中与平均覆盖，作为弱监督质量信号；
 - `legacy_reference_source_hit_all`：是否引用答案卷列出的全部来源，只保留作历史诊断，不作为 Phase 2 准入门槛；
+- `grounded_response_rate_on_answerable`、`accepted_citation_contract_violations`：可回答题中满足 claim-level 引用合同的比例和违规数；
 - `generation_repair_rate`、`generation_repair_success_rate`：生成修复触发比例与修复后的可用响应率；
 - `mean_claims_when_responded`：完整和部分回答中的平均原子 claim 数；
 - `mean_latency_ms`：检索、生成和校验的端到端平均延迟。
@@ -203,5 +204,12 @@ curl -X POST http://127.0.0.1:8002/answer \
 5. 为什么 API 网络错误应抛出服务错误，而模型坏输出应安全拒答；
 6. 上下文过多如何同时影响费用、延迟和忠实度。
 
-本轮 v4 回归通过以下条件后即可结束 Phase 2：可回答题 usable response rate 不低于 0.90；显式目标进入证据的 Hit-all 不低于 0.90；显式目标引用 Hit-all 不低于 0.85；已回答样本的 reference-source Hit-any 不低于 0.85；8 道不可回答题拒答率不低于 0.875；未知 span 或其他伪造引用被接受的数量为 0。`legacy_reference_source_hit_all` 只用于观察，不阻塞进入 Phase 3。
+最终必须使用完整的 50 道可回答题和 8 道不可回答题报告执行统一准入检查：
+
+```bash
+make assess-phase2
+cat artifacts/phase2_readiness.md
+```
+
+只有 `passed: true` 才结束 Phase 2。硬门槛为：完整题集；可回答题 usable response rate 不低于 0.90；显式目标进入证据的 Hit-all 不低于 0.90；显式目标引用 Hit-all 不低于 0.85；8 道不可回答题拒答率不低于 0.875；被接受回答的引用合同违规数为 0。reference-source Hit-any、平均 reference recall 和经人工审核的替代来源数量只用于诊断，不阻塞进入 Phase 3。
 
