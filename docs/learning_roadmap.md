@@ -67,7 +67,7 @@ Likely interview questions:
 - Why rerank only a candidate set instead of the entire corpus?
 - How would you update or delete one paper from the index?
 
-## Phase 2 — Evidence-grounded answering (current)
+## Phase 2 — Evidence-grounded answering (completed)
 
 Build:
 
@@ -96,7 +96,7 @@ Likely interview questions:
 - How do you prevent a paper from injecting instructions into the system prompt?
 - Why might a stronger LLM fail to improve the final score?
 
-## Phase 3 — Literature review and research ideation
+## Phase 3 — Literature review and research ideation (current)
 
 Build:
 
@@ -104,6 +104,7 @@ Build:
 - comparison tables whose cells retain source citations
 - a two-pass workflow: evidence extraction per paper, then cross-paper synthesis
 - research-gap output separating observed evidence, inferred limitation, hypothesis, proposed experiment, and uncertainty
+- a claim-to-fact provenance contract for every comparison cell and research idea
 
 Acceptance criteria:
 
@@ -111,6 +112,7 @@ Acceptance criteria:
 - conflicting numbers remain visible instead of being silently merged
 - ideas include falsifiable experiments and do not claim novelty without evidence
 - create a small qualitative rubric for traceability, novelty, feasibility, and uncertainty
+- a four-paper review can be rerun from one command and passes manual review of ten cells and all ideas
 
 You should understand map-reduce style synthesis, schema normalization, conflicting evidence, provenance, and why “prompting new ideas” needs a different evaluation from factual QA.
 

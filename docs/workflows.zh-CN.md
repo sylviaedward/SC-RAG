@@ -187,6 +187,8 @@ curl --get --data-urlencode 'q=低差异序列如何提高随机计算精度？'
 
 这里使用两遍处理，而不是把 50 篇论文一次塞入一个 Prompt。第一遍保证每篇论文的证据边界，第二遍才综合。研究思路必须区分论文明确结论、系统推断和待验证假设，不能把“可能的新颖”写成“首次提出”。
 
+当前 MVP 已实现为 `sc_rag.literature_review.LiteratureReviewService` 和 `POST /literature-review`。操作命令与字段说明见 [Phase 3 指南](phase3_guide.zh-CN.md)。
+
 进入下一阶段的门槛：比较表中每个关键单元格能回到论文页码；冲突数字不会被静默合并；至少一个研究思路包含可执行、可证伪的实验。
 
 ## 六、Phase 4：评测与可观测性

@@ -29,6 +29,7 @@ sc-rag-search = "sc_rag.search:main"
 sc-rag-dense-search = "sc_rag.dense:main"
 sc-rag-hybrid-search = "sc_rag.hybrid:main"
 sc-rag-answer = "sc_rag.answering:main"
+sc-rag-review = "sc_rag.literature_review:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

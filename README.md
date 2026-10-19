@@ -13,6 +13,7 @@ An evidence-grounded literature assistant for stochastic computing (SC). It inge
 - BM25 + multilingual dense retrieval with reciprocal-rank fusion
 - OpenAI-compatible grounded generation with application-resolved evidence-span citations
 - Explicit abstention for missing evidence or invalid model output
+- Two-pass literature review with per-paper facts, cited comparisons, and falsifiable research ideas
 
 Raw PDFs, source evaluation documents, generated chunks, and evaluation reports are intentionally ignored by Git.
 

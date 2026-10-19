@@ -8,8 +8,9 @@ RERANK_K ?= 30
 MAX_PER_PAPER ?= 2
 ANSWER_MODE ?= auto
 PHASE2_REPORT ?= artifacts/phase2_answerable_eval.json
+REVIEW_OUTPUT ?= artifacts/phase3_review.json
 
-.PHONY: system-deps setup setup-hybrid import-corpus manifest ingest dense-index test search dense-search hybrid-search-rrf hybrid-search answer evaluate evaluate-phase1-core evaluate-phase1-reranker analyze-phase1 evaluate-phase1 evaluate-phase2-unanswerable evaluate-phase2-answerable analyze-phase2 attribute-phase2 review-phase2-references assess-phase2 api
+.PHONY: system-deps setup setup-hybrid import-corpus manifest ingest dense-index test search dense-search hybrid-search-rrf hybrid-search answer literature-review evaluate evaluate-phase1-core evaluate-phase1-reranker analyze-phase1 evaluate-phase1 evaluate-phase2-unanswerable evaluate-phase2-answerable analyze-phase2 attribute-phase2 review-phase2-references assess-phase2 api
 
 system-deps:
 	@if command -v pdfinfo >/dev/null && command -v pdftotext >/dev/null; then \
@@ -64,6 +65,11 @@ hybrid-search:
 answer:
 	@test -n "$(QUERY)" || (echo 'Usage: make answer QUERY="your question" ANSWER_MODE=auto' && exit 2)
 	$(PYTHON) -m sc_rag.answering "$(QUERY)" --mode "$(ANSWER_MODE)" --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)"
+
+literature-review:
+	@test -n "$(TOPIC)" || (echo 'Usage: make literature-review TOPIC="topic" ALIASES="Sobol P2LSG"' && exit 2)
+	@test -n "$(ALIASES)" || (echo 'Usage: make literature-review TOPIC="topic" ALIASES="Sobol P2LSG"' && exit 2)
+	$(PYTHON) -m sc_rag.literature_review "$(TOPIC)" --aliases $(ALIASES) --output "$(REVIEW_OUTPUT)"
 
 evaluate:
 	$(PYTHON) scripts/evaluate_retrieval.py --k 10

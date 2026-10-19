@@ -8,7 +8,8 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import RedirectResponse
 
 from .answering import GroundedAnswerService, OpenAICompatibleChatClient, build_hybrid_retriever, load_known_aliases
-from .models import AnswerRequest, AnswerResponse, SearchResponse
+from .literature_review import LiteratureReviewService
+from .models import AnswerRequest, AnswerResponse, LiteratureReviewRequest, LiteratureReviewResponse, SearchResponse
 from .search import BM25Index
 
 
@@ -45,6 +46,11 @@ def get_answer_service() -> GroundedAnswerService:
     )
 
 
+@lru_cache(maxsize=1)
+def get_literature_review_service() -> LiteratureReviewService:
+    return LiteratureReviewService(get_index(), OpenAICompatibleChatClient.from_env())
+
+
 @app.get("/health")
 def health() -> dict[str, object]:
     try:
@@ -69,6 +75,18 @@ def search(
 def answer(request: AnswerRequest) -> AnswerResponse:
     try:
         return get_answer_service().answer(request.question, request.mode)
+    except (FileNotFoundError, RuntimeError, ValueError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.post("/literature-review", response_model=LiteratureReviewResponse)
+def literature_review(request: LiteratureReviewRequest) -> LiteratureReviewResponse:
+    try:
+        return get_literature_review_service().review(
+            request.topic,
+            request.aliases,
+            request.chunks_per_paper,
+        )
     except (FileNotFoundError, RuntimeError, ValueError) as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 
