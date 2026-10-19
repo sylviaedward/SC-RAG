@@ -7,8 +7,9 @@ CANDIDATE_K ?= 40
 RERANK_K ?= 30
 MAX_PER_PAPER ?= 2
 ANSWER_MODE ?= auto
+PHASE2_REPORT ?= artifacts/phase2_answerable_eval.json
 
-.PHONY: system-deps setup setup-hybrid import-corpus manifest ingest dense-index test search dense-search hybrid-search-rrf hybrid-search answer evaluate evaluate-phase1-core evaluate-phase1-reranker analyze-phase1 evaluate-phase1 evaluate-phase2-unanswerable evaluate-phase2-answerable analyze-phase2 api
+.PHONY: system-deps setup setup-hybrid import-corpus manifest ingest dense-index test search dense-search hybrid-search-rrf hybrid-search answer evaluate evaluate-phase1-core evaluate-phase1-reranker analyze-phase1 evaluate-phase1 evaluate-phase2-unanswerable evaluate-phase2-answerable analyze-phase2 attribute-phase2 api
 
 system-deps:
 	@if command -v pdfinfo >/dev/null && command -v pdftotext >/dev/null; then \
@@ -86,6 +87,9 @@ evaluate-phase2-answerable:
 
 analyze-phase2:
 	$(PYTHON) scripts/analyze_phase2_failures.py
+
+attribute-phase2:
+	$(PYTHON) scripts/attribute_phase2_failures.py --phase2 "$(PHASE2_REPORT)"
 
 api:
 	$(PYTHON) -m uvicorn sc_rag.api:app --host 0.0.0.0 --port $(PORT)

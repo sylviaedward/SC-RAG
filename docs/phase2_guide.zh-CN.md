@@ -104,6 +104,15 @@ cat artifacts/phase2_failure_analysis.md
 
 `phase2-grounded-v3-span-citations` 不再要求模型逐字复制 quote；旧版 `citation_quote_not_found_in_evidence` 仅用于分析历史报告。如果新版出现 `claim_referenced_unknown_span`，说明模型编造了 span ID；如果 `model_declared_insufficient` 占多数，应检查上下文覆盖和拒答提示。报告还会给出只在已回答样本上计算的 conditional citation gold Hit-any/Hit-all，避免把安全拒答和引用精度混成一个指标。
 
+若最终引用覆盖低于检索指标，运行跨阶段归因：
+
+```bash
+make attribute-phase2
+cat artifacts/phase2_attribution.md
+```
+
+该报告将 Phase 1 的逐题 Hybrid Top-10 与 Phase 2 最终引用连接起来：`retrieval_incomplete` 表示 gold 论文没有全部进入上下文，应改进召回或证据规划；`generation_omitted_retrieved_gold` 表示证据已进入上下文但模型漏引，应调整生成覆盖约束。不要在归因前同时修改检索和 Prompt。
+
 评测逐题写入 JSON，中途发生网络错误时，已完成结果仍会保留。主要指标含义：
 
 - `behavior_accuracy`：可回答题给出完整或部分证据回答、不可回答题拒答的比例；
