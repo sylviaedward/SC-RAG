@@ -530,6 +530,22 @@ class GroundedAnswerService:
                 "partial_output_contained_no_missing_information",
                 **abstention_context,
             )
+        if resolved_mode == AnswerMode.comparison and raw.evidence_sufficiency == EvidenceSufficiency.partial:
+            cited_aliases = {
+                by_span_id[citation.span_id].hit.alias
+                for claim in raw.claims
+                for citation in claim.citations
+                if citation.span_id in by_span_id
+            }
+            if len(cited_aliases) < 2:
+                return abstention(
+                    question,
+                    resolved_mode,
+                    self.client.model_name,
+                    len(evidence),
+                    "comparison_partial_missing_source_coverage",
+                    **abstention_context,
+                )
         if raw.evidence_sufficiency == EvidenceSufficiency.sufficient and raw.missing_information:
             return abstention(
                 question,

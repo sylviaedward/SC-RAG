@@ -173,6 +173,22 @@ class GroundedAnswerTests(unittest.TestCase):
         self.assertEqual({citation.alias for claim in response.claims for citation in claim.citations}, {"Sobol", "P2LSG"})
         self.assertIn("explicit_target_not_cited:P2LSG", client.user_prompt)
 
+    def test_comparison_partial_requires_two_source_citations(self) -> None:
+        client = FakeClient(
+            {
+                "evidence_sufficiency": "partial",
+                "confidence": 0.7,
+                "claims": [{"text": "Only one side is supported", "citations": [{"span_id": "E1.S1"}]}],
+                "missing_information": ["the second method's result"],
+                "reason": "Only one source was retrieved.",
+            }
+        )
+
+        response = GroundedAnswerService(FakeRetriever([alias_hit("A", 1)]), client).answer("比较两个方案")
+
+        self.assertEqual(response.status, AnswerStatus.abstained)
+        self.assertEqual(response.reason, "comparison_partial_missing_source_coverage")
+
     def test_repairs_malformed_json_once(self) -> None:
         repaired = {
             "evidence_sufficiency": "sufficient",
@@ -333,9 +349,8 @@ class GroundedAnswerTests(unittest.TestCase):
 
         response = GroundedAnswerService(FakeRetriever([hit()]), client).answer("比较两种乘法")
 
-        self.assertEqual(response.status, AnswerStatus.partial)
-        self.assertEqual(response.missing_information, ["双极带负号乘法所用逻辑门"])
-        self.assertIn("未找到充分证据", response.answer)
+        self.assertEqual(response.status, AnswerStatus.abstained)
+        self.assertEqual(response.reason, "comparison_partial_missing_source_coverage")
 
     def test_duplicate_citations_are_deduplicated(self) -> None:
         citation = {"span_id": "E1.S1"}

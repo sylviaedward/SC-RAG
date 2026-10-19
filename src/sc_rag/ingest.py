@@ -39,13 +39,29 @@ def split_page(text: str, target_chars: int = 1400, overlap_chars: int = 180) ->
     return chunks
 
 
+_REFERENCES_HEADING = re.compile(
+    r"^\s*(?:references|bibliography|参考文献|引用文献)\s*:?\s*$",
+    re.IGNORECASE,
+)
+
+
+def strip_references_section(text: str) -> str:
+    """Remove bibliography text so citations cannot become answer evidence."""
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if _REFERENCES_HEADING.fullmatch(line):
+            return "\n".join(lines[:index]).strip()
+    return text
+
+
 def iter_chunks(manifest_path: Path, repo_root: Path) -> list[Chunk]:
     chunks: list[Chunk] = []
     for paper in load_manifest(manifest_path):
         pdf_path = repo_root / str(paper["relative_path"])
         with fitz.open(pdf_path) as document:
             for page_index, page in enumerate(document, start=1):
-                for local_index, text in enumerate(split_page(page.get_text("text"))):
+                page_text = strip_references_section(page.get_text("text"))
+                for local_index, text in enumerate(split_page(page_text)):
                     identity = f"{paper['paper_id']}:{page_index}:{local_index}"
                     suffix = hashlib.sha1(identity.encode()).hexdigest()[:10]
                     chunks.append(
