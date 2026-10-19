@@ -10,7 +10,7 @@ ANSWER_MODE ?= auto
 PHASE2_REPORT ?= artifacts/phase2_answerable_eval.json
 REVIEW_OUTPUT ?= artifacts/phase3_review.json
 
-.PHONY: system-deps setup setup-hybrid setup-ui import-corpus manifest ingest dense-index test search dense-search hybrid-search-rrf hybrid-search answer literature-review evaluate evaluate-phase1-core evaluate-phase1-reranker analyze-phase1 evaluate-phase1 evaluate-phase2-unanswerable evaluate-phase2-answerable analyze-phase2 attribute-phase2 review-phase2-references assess-phase2 api ui
+.PHONY: system-deps setup setup-hybrid setup-ui import-corpus manifest ingest dense-index test search dense-search hybrid-search-rrf hybrid-search answer literature-review evaluate evaluate-phase1-core evaluate-phase1-reranker analyze-phase1 evaluate-phase1 evaluate-phase2-unanswerable evaluate-phase2-answerable evaluate-phase4 analyze-phase2 attribute-phase2 review-phase2-references assess-phase2 api ui
 
 system-deps:
 	@if command -v pdfinfo >/dev/null && command -v pdftotext >/dev/null; then \
@@ -93,6 +93,9 @@ evaluate-phase2-unanswerable:
 
 evaluate-phase2-answerable:
 	$(PYTHON) scripts/evaluate_phase2.py --scope answerable --output artifacts/phase2_answerable_eval.json --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)"
+
+evaluate-phase4:
+	$(PYTHON) scripts/evaluate_phase4.py --output artifacts/phase4_eval.json --embedding-provider "$(EMBEDDING_PROVIDER)" --embedding-model "$(EMBEDDING_MODEL)"
 
 analyze-phase2:
 	$(PYTHON) scripts/analyze_phase2_failures.py

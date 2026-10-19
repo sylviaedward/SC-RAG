@@ -1,25 +1,28 @@
 # SC-RAG
 
-An evidence-grounded literature assistant for stochastic computing (SC). It ingests 50 papers into page-aware chunks, runs bilingual hybrid retrieval, and produces claim-level answers whose quotations, chunks, and PDF pages are validated before delivery.
+SC-RAG is an evidence-grounded research agent for stochastic-computing literature. It turns a 50-paper corpus into page-aware evidence, retrieves across Chinese and English terminology, validates every claim against trusted spans, and supports two-pass literature review with auditable comparisons and falsifiable research ideas.
 
-## Current capabilities
+The project is designed as a reproducible RAG system rather than a chat wrapper:
 
-- Verified 50-paper corpus manifest with stable hashes and aliases
-- 58-question benchmark split into question-only and isolated gold files
-- Page-aware PDF ingestion with stable chunk IDs
-- Chinese/English domain term expansion and BM25 retrieval
-- Search API returning paper title, benchmark alias, PDF page, score, and source text
-- Retrieval evaluation using gold paper aliases
-- BM25 + multilingual dense retrieval with reciprocal-rank fusion
-- OpenAI-compatible grounded generation with application-resolved evidence-span citations
-- Explicit abstention for missing evidence or invalid model output
-- Two-pass literature review with per-paper facts, cited comparisons, and falsifiable research ideas
+```text
+PDF corpus → manifest → page-aware chunks → BM25 + dense RRF retrieval
+          → alias-aware evidence planning → structured generation
+          → citation/span validation → answer or explicit abstention
+          → literature-review extraction → cross-paper synthesis
+```
 
-Raw PDFs, source evaluation documents, generated chunks, and evaluation reports are intentionally ignored by Git.
+## What makes it interview-worthy
 
-## Run in GitHub Codespaces
+- **Grounding contract:** the model can cite only application-issued span IDs; excerpts and PDF pages are resolved from trusted retrieval metadata.
+- **Alias-aware planning:** explicit papers such as `[Sobol]` and `[P2LSG]` are fetched and covered independently, preventing one-paper dominance in comparison questions.
+- **Fail-closed behavior:** malformed output, unknown spans, unsupported claims, incomplete comparisons, and insufficient evidence become an abstention rather than a plausible hallucination.
+- **Two-pass research workflow:** each paper is first reduced to typed facts, then a synthesis pass compares only validated facts and binds every idea to evidence.
+- **Reproducible evaluation:** answerable/unanswerable regression sets, retrieval metrics, citation-contract checks, latency, repair counts, and cross-layer failure attribution are saved as JSON.
+- **Usable demo:** FastAPI exposes the contract; Streamlit presents answers, page evidence, comparisons, and research ideas.
 
-Start with the environment and tests; these do not require the raw papers:
+## Quick start
+
+Python 3.11+ and Poppler are required. In a fresh Codespace:
 
 ```bash
 make system-deps
@@ -27,36 +30,72 @@ make setup
 make test
 ```
 
-Create `imports/`, upload the four `SC_Liter*.zip` archives into it, then build the local index:
+To build the local corpus index, place the supplied `SC_Liter*.zip` archives under `imports/`:
 
 ```bash
 mkdir -p imports
 make import-corpus ARCHIVES="imports/SC_Liter*.zip"
 make manifest
 make ingest
+make dense-index
 ```
 
-Run a query, the benchmark, and the API:
+Configure one complete OpenAI-compatible LLM variable group in the environment:
+
+```text
+DEEPSEEK_BASE_URL + DEEPSEEK_API_KEY + DEEPSEEK_MODEL_ID
+```
+
+or the equivalent `OPENAI_*` / `SC_RAG_LLM_*` group. Credentials are never committed or shown by the application.
+
+Run the API and UI in separate terminals:
 
 ```bash
-make search QUERY="随机计算中的相关性如何影响乘法器精度？"
-make evaluate
-make answer QUERY="单极格式下什么逻辑门实现乘法？" ANSWER_MODE=fundamentals
-make api
+make api PORT=8000
+make setup-ui
+make ui
 ```
 
-If port 8000 is already occupied, first check whether SC-RAG is already running with `curl http://127.0.0.1:8000/health`. Otherwise start on another port with `make api PORT=8001`.
+Open the forwarded port `8501` for the Streamlit workspace. For a command-line smoke test:
 
-Python 3.11+ and Poppler (`pdfinfo`, `pdftotext`) are required. `make system-deps` installs Poppler through `apt` when it is missing. See the [Chinese workflow and code guide](docs/workflows.zh-CN.md) for expected outputs, the processing rationale, code locations, debugging exercises, and the readiness gate for each phase.
+```bash
+make answer QUERY="单极格式下什么逻辑门实现乘法？" ANSWER_MODE=fundamentals
+```
 
-## MVP path
+## Evaluation
 
-1. Freeze a domain-reviewed benchmark and atomic scoring rubric.
-2. Add dense retrieval, reciprocal-rank fusion, and a reranker; compare every stage against this BM25 baseline.
-3. Add OpenAI-compatible generation with claim-level citations and explicit abstention.
-4. Add literature-comparison and research-gap workflows over selected evidence sets.
-5. Add a Streamlit review UI, request tracing, Docker packaging, and a reproducible evaluation report.
+The benchmark contains 50 answerable and 8 unanswerable questions. Run the complete Phase 4 evaluation with one command:
 
-See [the data audit](docs/data_audit.md) for known corpus and benchmark limitations.
-The [completion and learning roadmap](docs/learning_roadmap.md) pairs every implementation phase with concepts, acceptance criteria, and likely interview questions.
-For retrieval experiments, follow the [Phase 1 Chinese guide](docs/phase1_guide.zh-CN.md). For alias-aware evidence planning, grounded answers, citation validation, and abstention evaluation, follow the [Phase 2 Chinese guide](docs/phase2_guide.zh-CN.md).
+```bash
+make evaluate-phase4
+```
+
+The report records the dataset/configuration version, category metrics, latency, repair attempts, retrieval evidence aliases, model status, and failure taxonomy. To inspect the ten human-reviewed attribution cases:
+
+```bash
+python scripts/generate_phase4_human_review.py
+```
+
+Generated indexes, traces, reports, raw PDFs, and source benchmark documents stay outside Git through `.gitignore`.
+
+## Repository map
+
+```text
+src/sc_rag/answering.py          grounded answering and citation validation
+src/sc_rag/ingest.py             PDF extraction and References filtering
+src/sc_rag/hybrid.py             BM25/dense reciprocal-rank fusion
+src/sc_rag/literature_review.py  two-pass paper extraction and synthesis
+src/sc_rag/api.py                FastAPI contract
+ui/app.py                        Streamlit research workspace
+scripts/evaluate_phase4.py       reproducible evaluation and traces
+tests/                           retrieval, grounding, gating, and schema tests
+```
+
+## API contract
+
+- `GET /health` — index readiness
+- `GET /search?q=...` — ranked citable chunks
+- `POST /answer` — grounded answer with claims, citations, status, and abstention reason
+- `POST /literature-review` — fact-bound multi-paper review and research ideas
+
+The public repository intentionally keeps implementation and product documentation concise. Detailed learning notes and interview preparation are maintained separately from the checkout.

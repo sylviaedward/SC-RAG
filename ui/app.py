@@ -41,8 +41,19 @@ def render_citations(claims: list[dict[str, object]]) -> None:
 
 
 st.set_page_config(page_title="SC-RAG Research Workspace", page_icon="🔬", layout="wide")
+st.markdown(
+    """
+    <style>
+    .block-container {max-width: 1180px; padding-top: 2rem;}
+    [data-testid="stMetricValue"] {font-size: 1.35rem;}
+    .stButton > button {border-radius: 0.6rem; font-weight: 600;}
+    section[data-testid="stSidebar"] {background: #f5f7fb;}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 st.title("🔬 SC-RAG Research Workspace")
-st.caption(f"FastAPI: {API_URL}")
+st.caption("Evidence-grounded literature research · FastAPI backend · auditable citations")
 
 answer_tab, review_tab = st.tabs(["Grounded Q&A", "Literature Review"])
 
