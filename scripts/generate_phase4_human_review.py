@@ -75,6 +75,8 @@ def resolve_rows(answerable: list[dict[str, object]], unanswerable: list[dict[st
             candidates = [row for row in answerable if row.get("category") == category and row.get("status") == "partial"]
         else:
             candidates = [row for row in attr_rows if row.get("category") == category and row.get("cause") == cause]
+            if category == "fundamentals" and cause == "grounded_alternative_source":
+                candidates.sort(key=lambda row: str(row.get("id")) != "A8")
         candidates = [row for row in candidates if str(row.get("id")) not in used]
         if not candidates:
             raise ValueError(f"could not resolve sample category={category!r} cause={cause!r}")
