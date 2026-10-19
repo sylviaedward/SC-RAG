@@ -117,6 +117,18 @@ class LiteratureReviewTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "phase3_unknown_fact:F99"):
             LiteratureReviewService(self.index, client).review("sequence generators", ["Sobol", "P2LSG"], 1)
 
+    def test_accepts_known_json_object_transport_marker(self) -> None:
+        synthesis = {
+            "type": "json_object",
+            "comparison": [],
+            "ideas": [],
+        }
+        client = SequenceClient([extraction("fact a"), extraction("fact b"), synthesis])
+
+        result = LiteratureReviewService(self.index, client).review("sequence generators", ["Sobol", "P2LSG"], 1)
+
+        self.assertEqual(result.comparison[0].dimension, ReviewDimension.method)
+
 
 if __name__ == "__main__":
     unittest.main()

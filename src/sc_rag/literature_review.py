@@ -118,14 +118,24 @@ def complete_model(
     prompt: str,
     schema: type[BaseModel],
 ) -> BaseModel:
+    def validate(content: str) -> BaseModel:
+        payload = parse_json_object(content)
+        # Some compatible relays/models wrap a JSON object with a transport
+        # marker such as {"type":"json_object", ...}. The marker is not
+        # application data; remove only this exact known wrapper field before
+        # applying the strict schema.
+        if payload.get("type") == "json_object":
+            payload = {key: value for key, value in payload.items() if key != "type"}
+        return schema.model_validate(payload)
+
     content = client.complete(system_prompt, prompt)
     try:
-        return schema.model_validate(parse_json_object(content))
+        return validate(content)
     except (json.JSONDecodeError, ValidationError, ValueError) as error:
         issue = validation_issue(error)
     repaired = client.complete(system_prompt, build_repair_prompt(prompt, content, issue))
     try:
-        return schema.model_validate(parse_json_object(repaired))
+        return validate(repaired)
     except (json.JSONDecodeError, ValidationError, ValueError) as error:
         raise ValueError(f"phase3_model_output_invalid_after_repair:{validation_issue(error)}") from error
 
