@@ -20,7 +20,19 @@ PDF corpus → manifest → page-aware chunks → BM25 + dense RRF retrieval
 - **Reproducible evaluation:** answerable/unanswerable regression sets, retrieval metrics, citation-contract checks, latency, repair counts, and cross-layer failure attribution are saved as JSON.
 - **Usable demo:** FastAPI exposes the contract; Streamlit presents answers, page evidence, comparisons, and research ideas.
 
-## Quick start
+## Run modes
+
+SC-RAG supports three run modes. They use the same retrieval and answering code; choose the mode based on the audience and available resources.
+
+| Mode | Use case | What it requires |
+| --- | --- | --- |
+| **Cloud development** | Build the corpus, run evaluations, inspect traces, and develop in Codespaces | Python environment, Poppler, corpus archives, and model credentials |
+| **Local lightweight run** | Run the API and Streamlit directly on a laptop or workstation | Python 3.11+, Poppler, generated artifacts, and model credentials |
+| **Containerized demo** | Let an interviewer start the complete API + UI with one command | Docker Compose, generated artifacts, and a model credential in `.env` |
+
+Cloud development and containerized deployment are intentionally separate. Codespaces is useful for indexing and evaluation, while an interviewer can run the already-built demo locally with Docker. Docker is not required in the Codespace.
+
+## Quick start: local development
 
 Python 3.11+ and Poppler are required. In a fresh Codespace:
 
@@ -62,18 +74,45 @@ Open the forwarded port `8501` for the Streamlit workspace. For a command-line s
 make answer QUERY="单极格式下什么逻辑门实现乘法？" ANSWER_MODE=fundamentals
 ```
 
-### Docker demo
+### Docker demo: one-command interview setup
 
-After the local corpus and dense index have been built, copy `.env.example` to `.env`, fill one complete LLM group, and start both services with:
+Docker is the recommended interview path because it starts the FastAPI backend and Streamlit UI together with the same pinned application image. The interviewer needs Docker Desktop (or Docker Engine + Compose), a copy of the repository, the generated `artifacts/` directory, and one complete LLM variable group.
+
+The public repository excludes raw PDFs and generated indexes. Prepare `artifacts/` once in Codespaces or copy a prepared artifact bundle next to the checkout. The artifact bundle should contain:
+
+```text
+artifacts/chunks.jsonl
+artifacts/dense/embeddings.npy
+artifacts/dense/metadata.json
+```
+
+Then run:
 
 ```bash
 cp .env.example .env
+# Fill OPENAI_*, DEEPSEEK_*, or SC_RAG_LLM_* in .env.
 docker compose up --build -d
 curl http://127.0.0.1:8000/health
 curl http://127.0.0.1:8000/ready
 ```
 
-Open port `8501` for the UI. `docker compose down` stops the demo. Docker mounts `artifacts/` read-only; the repository intentionally excludes PDFs and generated indexes, so a fresh clone must build or receive those artifacts before the full answering demo can run.
+Open `http://127.0.0.1:8501` for the UI and `http://127.0.0.1:8000/docs` for the API contract. The UI container calls the API over the Compose network, so no host-side `SC_RAG_API_URL` setting is needed.
+
+Useful operations:
+
+```bash
+docker compose ps                 # service status
+docker compose logs -f --tail=100 # troubleshoot startup
+docker compose down               # stop and remove the demo
+```
+
+`/health` checks the indexed corpus. `/ready` also checks the dense index and complete LLM configuration. If the API port is occupied, choose alternate host ports without changing the containers:
+
+```bash
+SC_RAG_API_PORT=8001 SC_RAG_UI_PORT=8502 docker compose up --build -d
+```
+
+Then open port `8502` and use `http://127.0.0.1:8001` for the API. The first Docker build downloads the Python and ML dependencies and can take several minutes; later starts use the image cache. Docker mounts `artifacts/` and `data/` read-only, and `.env` is ignored by Git.
 
 ## Evaluation
 
