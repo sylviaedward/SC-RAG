@@ -10,7 +10,7 @@ ANSWER_MODE ?= auto
 PHASE2_REPORT ?= artifacts/phase2_answerable_eval.json
 REVIEW_OUTPUT ?= artifacts/phase3_review.json
 
-.PHONY: system-deps setup setup-hybrid setup-ui docker-up docker-down docker-logs import-corpus manifest ingest dense-index test search dense-search hybrid-search-rrf hybrid-search answer literature-review evaluate evaluate-phase1-core evaluate-phase1-reranker analyze-phase1 evaluate-phase1 evaluate-phase2-unanswerable evaluate-phase2-answerable evaluate-phase4 analyze-phase2 attribute-phase2 review-phase2-references assess-phase2 api ui
+.PHONY: system-deps setup setup-hybrid setup-ui docker-up docker-down docker-logs import-corpus prepare-corpus manifest ingest dense-index test search dense-search hybrid-search-rrf hybrid-search answer literature-review evaluate evaluate-phase1-core evaluate-phase1-reranker analyze-phase1 evaluate-phase1 evaluate-phase2-unanswerable evaluate-phase2-answerable evaluate-phase4 analyze-phase2 attribute-phase2 review-phase2-references assess-phase2 api ui
 
 system-deps:
 	@if command -v pdfinfo >/dev/null && command -v pdftotext >/dev/null; then \
@@ -43,6 +43,10 @@ docker-logs:
 import-corpus:
 	@test -n "$(ARCHIVES)" || (echo 'Usage: make import-corpus ARCHIVES="imports/SC_Liter*.zip"' && exit 2)
 	$(PYTHON) scripts/import_corpus_archives.py $(ARCHIVES)
+
+prepare-corpus:
+	@test -n "$(ARCHIVES)" || (echo 'Usage: make prepare-corpus ARCHIVES="imports/SC_Liter*.zip"' && exit 2)
+	$(PYTHON) scripts/prepare_curated_corpus.py --manifest data/metadata/papers.jsonl $(ARCHIVES)
 
 manifest:
 	@command -v pdfinfo >/dev/null || (echo 'Missing pdfinfo. Run: make system-deps' && exit 2)

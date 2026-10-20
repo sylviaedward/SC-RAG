@@ -59,12 +59,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Import and deduplicate SC corpus archives")
     parser.add_argument("archives", nargs="+", type=Path)
     parser.add_argument("--output", type=Path, default=Path("data/raw/papers"))
+    parser.add_argument(
+        "--expected-count",
+        type=int,
+        default=50,
+        help="Fail unless this many PDFs are present; use 0 when importing into a staging directory.",
+    )
     args = parser.parse_args()
     imported, duplicates = import_archives(args.archives, args.output)
     total = len(list(args.output.glob("*.pdf")))
     print(f"imported={imported} duplicate_files_skipped={duplicates} unique_pdfs={total}")
-    if total != 50:
-        raise SystemExit(f"Expected 50 unique PDFs, found {total}")
+    if args.expected_count and total != args.expected_count:
+        raise SystemExit(f"Expected {args.expected_count} unique PDFs, found {total}")
 
 
 if __name__ == "__main__":

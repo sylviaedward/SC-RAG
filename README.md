@@ -52,6 +52,19 @@ make ingest
 make dense-index
 ```
 
+The supplied archives may contain more papers than the benchmark's canonical
+50-paper corpus. To import the original archives and select the exact papers
+listed by the checked-in manifest in one step, use:
+
+```bash
+make prepare-corpus ARCHIVES="imports/SC_Liter*.zip"
+make manifest
+make ingest
+```
+
+This staging-and-selection flow avoids the `Expected 50 unique PDFs, found
+100` error when the four source archives contain additional papers.
+
 Configure one complete OpenAI-compatible LLM variable group in the environment:
 
 ```text
