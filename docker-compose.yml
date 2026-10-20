@@ -1,0 +1,40 @@
+services:
+  api:
+    build: .
+    command: ["uvicorn", "sc_rag.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      SC_RAG_INDEX: /app/artifacts/chunks.jsonl
+      SC_RAG_DENSE_MATRIX: /app/artifacts/dense/embeddings.npy
+      SC_RAG_DENSE_METADATA: /app/artifacts/dense/metadata.json
+      SC_RAG_EMBEDDING_PROVIDER: ${SC_RAG_EMBEDDING_PROVIDER:-local}
+      SC_RAG_EMBEDDING_MODEL: ${SC_RAG_EMBEDDING_MODEL:-intfloat/multilingual-e5-small}
+      SC_RAG_LLM_BASE_URL: ${SC_RAG_LLM_BASE_URL:-}
+      SC_RAG_LLM_API_KEY: ${SC_RAG_LLM_API_KEY:-}
+      SC_RAG_LLM_MODEL: ${SC_RAG_LLM_MODEL:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL_ID: ${OPENAI_MODEL_ID:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL_ID: ${DEEPSEEK_MODEL_ID:-}
+    volumes:
+      - ./artifacts:/app/artifacts:ro
+      - ./data:/app/data:ro
+    ports:
+      - "${SC_RAG_API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  ui:
+    build: .
+    command: ["streamlit", "run", "ui/app.py", "--server.address", "0.0.0.0", "--server.port", "8501"]
+    environment:
+      SC_RAG_API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${SC_RAG_UI_PORT:-8501}:8501"

@@ -62,6 +62,19 @@ Open the forwarded port `8501` for the Streamlit workspace. For a command-line s
 make answer QUERY="单极格式下什么逻辑门实现乘法？" ANSWER_MODE=fundamentals
 ```
 
+### Docker demo
+
+After the local corpus and dense index have been built, copy `.env.example` to `.env`, fill one complete LLM group, and start both services with:
+
+```bash
+cp .env.example .env
+docker compose up --build -d
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/ready
+```
+
+Open port `8501` for the UI. `docker compose down` stops the demo. Docker mounts `artifacts/` read-only; the repository intentionally excludes PDFs and generated indexes, so a fresh clone must build or receive those artifacts before the full answering demo can run.
+
 ## Evaluation
 
 The benchmark contains 50 answerable and 8 unanswerable questions. Run the complete Phase 4 evaluation with one command:
@@ -94,6 +107,7 @@ tests/                           retrieval, grounding, gating, and schema tests
 ## API contract
 
 - `GET /health` — index readiness
+- `GET /ready` — full hybrid answering readiness, including dense artifacts and LLM configuration
 - `GET /search?q=...` — ranked citable chunks
 - `POST /answer` — grounded answer with claims, citations, status, and abstention reason
 - `POST /literature-review` — fact-bound multi-paper review and research ideas

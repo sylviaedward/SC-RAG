@@ -60,6 +60,16 @@ def health() -> dict[str, object]:
     return {"status": "ok", "chunks": len(index.chunks), "retriever": "bm25"}
 
 
+@app.get("/ready")
+def ready() -> dict[str, object]:
+    """Report whether the full hybrid answering service can be constructed."""
+    try:
+        service = get_answer_service()
+    except (FileNotFoundError, RuntimeError, ValueError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    return {"status": "ready", "model": service.client.model_name}
+
+
 @app.get("/search", response_model=SearchResponse)
 def search(
     q: str = Query(min_length=2),
