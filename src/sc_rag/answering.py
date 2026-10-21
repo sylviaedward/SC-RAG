@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -157,16 +158,37 @@ class OpenAICompatibleChatClient:
             ],
         }
         try:
-            return self._post({**payload, "response_format": {"type": "json_object"}})
+            return self._post_with_retry({**payload, "response_format": {"type": "json_object"}})
         except urllib.error.HTTPError as error:
             if error.code != 400:
                 self._raise_http_error(error)
         # Some OpenAI-compatible relays reject response_format. The prompt and
         # fail-closed parser still require one strict JSON object on this retry.
         try:
-            return self._post(payload)
+            return self._post_with_retry(payload)
         except urllib.error.HTTPError as error:
             self._raise_http_error(error)
+
+    def _post_with_retry(self, payload: dict[str, object]) -> str:
+        retries = max(0, int(os.getenv("SC_RAG_LLM_RETRIES", "2")))
+        backoff = max(0.0, float(os.getenv("SC_RAG_LLM_BACKOFF_SECONDS", "0.5")))
+        for attempt in range(retries + 1):
+            try:
+                return self._post(payload)
+            except urllib.error.HTTPError as error:
+                retryable = error.code == 408 or error.code == 429 or error.code >= 500
+                if not retryable or attempt >= retries:
+                    raise
+                time.sleep(backoff * (2**attempt))
+            except urllib.error.URLError:
+                if attempt >= retries:
+                    raise
+                time.sleep(backoff * (2**attempt))
+            except RuntimeError as error:
+                if not str(error).startswith("Could not reach the LLM API:") or attempt >= retries:
+                    raise
+                time.sleep(backoff * (2**attempt))
+        raise RuntimeError("LLM request exhausted retry budget")
 
     def _post(self, payload: dict[str, object]) -> str:
         endpoint = self.base_url if self.base_url.endswith("/chat/completions") else f"{self.base_url}/chat/completions"

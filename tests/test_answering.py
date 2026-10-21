@@ -246,6 +246,18 @@ class GroundedAnswerTests(unittest.TestCase):
         retry_payload = json.loads(urlopen.call_args.args[0].data)
         self.assertNotIn("response_format", retry_payload)
 
+    @patch.dict("os.environ", {"SC_RAG_LLM_RETRIES": "2", "SC_RAG_LLM_BACKOFF_SECONDS": "0"})
+    @patch("urllib.request.urlopen")
+    def test_client_retries_transient_gateway_error(self, urlopen: MagicMock) -> None:
+        response = MagicMock()
+        response.read.return_value = b'{"choices":[{"message":{"content":"{}"}}]}'
+        response.__enter__.return_value = response
+        urlopen.side_effect = [urllib.error.URLError("temporary"), response]
+        client = OpenAICompatibleChatClient("https://llm.example/v1", "secret", "chat-model")
+
+        self.assertEqual(client.complete("system", "user"), "{}")
+        self.assertEqual(urlopen.call_count, 2)
+
     def test_builds_citations_from_trusted_retrieval_metadata(self) -> None:
         client = FakeClient(
             {
