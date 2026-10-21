@@ -98,6 +98,24 @@ make answer QUERY="单极格式下什么逻辑门实现乘法？" ANSWER_MODE=fu
 
 Docker is the recommended interview path because it starts the FastAPI backend and Streamlit UI together with the same pinned application image. The interviewer needs Docker Desktop (or Docker Engine + Compose), a copy of the repository, the generated `artifacts/` directory, and one complete LLM variable group.
 
+For the shortest live demonstration, run the API and UI directly in two terminals:
+
+```bash
+make api PORT=8000
+make ui
+```
+
+Then open `http://127.0.0.1:8501`, ask a grounded question, and expand **Agent trace** to show classification, bounded retrieval supplementation, evidence gating, and the final stop reason. The same flow is available over HTTP:
+
+```bash
+curl http://127.0.0.1:8000/ready
+curl -X POST http://127.0.0.1:8000/answer \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"What is stochastic computing?","mode":"fundamentals"}'
+```
+
+`/ready` reports `hybrid_rrf` when the optional dense artifacts are present. If those model weights are unavailable, the service explicitly reports `bm25_fallback` and remains fully usable for the Agent trace and grounded-answer demonstration; it never labels the fallback as hybrid retrieval.
+
 The public repository excludes raw PDFs and generated indexes. Prepare `artifacts/` once in Codespaces or copy a prepared artifact bundle next to the checkout. The artifact bundle should contain:
 
 ```text

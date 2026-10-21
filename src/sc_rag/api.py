@@ -33,14 +33,22 @@ def get_index() -> BM25Index:
 @lru_cache(maxsize=1)
 def get_answer_service() -> GroundedAnswerService:
     chunks = Path(os.getenv("SC_RAG_INDEX", "artifacts/chunks.jsonl"))
-    return GroundedAnswerService(
-        build_hybrid_retriever(
+    matrix = Path(os.getenv("SC_RAG_DENSE_MATRIX", "artifacts/dense/embeddings.npy"))
+    metadata = Path(os.getenv("SC_RAG_DENSE_METADATA", "artifacts/dense/metadata.json"))
+    if matrix.exists() and metadata.exists():
+        retriever = build_hybrid_retriever(
             chunks=chunks,
-            matrix=Path(os.getenv("SC_RAG_DENSE_MATRIX", "artifacts/dense/embeddings.npy")),
-            metadata=Path(os.getenv("SC_RAG_DENSE_METADATA", "artifacts/dense/metadata.json")),
+            matrix=matrix,
+            metadata=metadata,
             embedding_provider=os.getenv("SC_RAG_EMBEDDING_PROVIDER", "local"),
             embedding_model=os.getenv("SC_RAG_EMBEDDING_MODEL", "intfloat/multilingual-e5-small"),
-        ),
+        )
+    else:
+        # A checked-in BM25 index keeps the API and Agent demo runnable when
+        # optional embedding weights are unavailable (for example offline).
+        retriever = get_index()
+    return GroundedAnswerService(
+        retriever,
         OpenAICompatibleChatClient.from_env(),
         known_aliases=load_known_aliases(chunks),
     )
@@ -67,7 +75,10 @@ def ready() -> dict[str, object]:
         service = get_answer_service()
     except (FileNotFoundError, RuntimeError, ValueError) as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
-    return {"status": "ready", "model": service.client.model_name}
+    matrix = Path(os.getenv("SC_RAG_DENSE_MATRIX", "artifacts/dense/embeddings.npy"))
+    metadata = Path(os.getenv("SC_RAG_DENSE_METADATA", "artifacts/dense/metadata.json"))
+    retriever = "hybrid_rrf" if matrix.exists() and metadata.exists() else "bm25_fallback"
+    return {"status": "ready", "model": service.client.model_name, "retriever": retriever}
 
 
 @app.get("/search", response_model=SearchResponse)

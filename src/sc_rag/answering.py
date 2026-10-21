@@ -137,7 +137,8 @@ class OpenAICompatibleChatClient:
             values = tuple(os.getenv(name, "").strip() for name in names)
             present = [name for name, value in zip(names, values) if value]
             if len(present) == len(names):
-                return cls(*values)
+                timeout = float(os.getenv("SC_RAG_LLM_TIMEOUT", "90"))
+                return cls(*values, timeout=timeout)
             if present:
                 missing = [name for name, value in zip(names, values) if not value]
                 incomplete.append(f"{label} missing {', '.join(missing)}")
@@ -172,7 +173,12 @@ class OpenAICompatibleChatClient:
         request = urllib.request.Request(
             endpoint,
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "sc-rag/0.1 (+https://github.com/sylviaedward/SC-RAG)",
+            },
             method="POST",
         )
         try:
