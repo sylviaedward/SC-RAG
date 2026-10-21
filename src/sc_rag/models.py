@@ -70,6 +70,20 @@ class AnswerClaim(BaseModel):
     citations: list[Citation] = Field(min_length=1)
 
 
+class AgentStep(BaseModel):
+    action: str
+    status: str
+    detail: str = ""
+
+
+class AgentTrace(BaseModel):
+    task_type: AnswerMode
+    plan: list[str] = Field(default_factory=list)
+    steps: list[AgentStep] = Field(default_factory=list)
+    retrieval_rounds: int = Field(default=0, ge=0)
+    stop_reason: str = ""
+
+
 class AnswerResponse(BaseModel):
     question: str
     mode: AnswerMode
@@ -88,6 +102,7 @@ class AnswerResponse(BaseModel):
     generation_attempts: int = Field(default=1, ge=0)
     repair_reason: str | None = None
     model: str
+    agent_trace: AgentTrace | None = None
 
 
 class ReviewDimension(str, Enum):

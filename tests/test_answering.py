@@ -140,6 +140,9 @@ class GroundedAnswerTests(unittest.TestCase):
         self.assertEqual(response.requested_aliases, ["Sobol", "P2LSG"])
         self.assertEqual(response.evidence_aliases, ["Sobol", "P2LSG"])
         self.assertEqual(response.missing_requested_aliases, [])
+        self.assertIsNotNone(response.agent_trace)
+        self.assertEqual(response.agent_trace.task_type, AnswerMode.comparison)
+        self.assertIn("supplement_retrieve", [step.action for step in response.agent_trace.steps])
 
     def test_repairs_one_omitted_explicit_target(self) -> None:
         first = {

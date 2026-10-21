@@ -11,6 +11,12 @@ PDF corpus → manifest → page-aware chunks → BM25 + dense RRF retrieval
           → literature-review extraction → cross-paper synthesis
 ```
 
+The public demo also exposes a bounded Agent control layer in the same
+repository. It classifies the request, records a retrieval plan, performs
+targeted alias supplementation when needed, applies the grounding gate, and
+returns an `agent_trace` that the Streamlit UI can inspect. The model never
+chooses arbitrary tools or receives authority to bypass citation validation.
+
 ## What makes it interview-worthy
 
 - **Grounding contract:** the model can cite only application-issued span IDs; excerpts and PDF pages are resolved from trusted retrieval metadata.
@@ -19,6 +25,7 @@ PDF corpus → manifest → page-aware chunks → BM25 + dense RRF retrieval
 - **Two-pass research workflow:** each paper is first reduced to typed facts, then a synthesis pass compares only validated facts and binds every idea to evidence.
 - **Reproducible evaluation:** answerable/unanswerable regression sets, retrieval metrics, citation-contract checks, latency, repair counts, and cross-layer failure attribution are saved as JSON.
 - **Usable demo:** FastAPI exposes the contract; Streamlit presents answers, page evidence, comparisons, and research ideas.
+- **Agent harness:** every answer records classification, plan, retrieval rounds, evidence gating, repair, and finalization steps for debugging and interviews.
 
 ## Run modes
 

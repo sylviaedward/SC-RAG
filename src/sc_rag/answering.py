@@ -15,6 +15,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from .dense import DEFAULT_EMBEDDING_MODEL, DenseIndex, create_embedder
 from .hybrid import HybridRetriever
 from .models import (
+    AgentStep,
+    AgentTrace,
     AnswerClaim,
     AnswerMode,
     AnswerResponse,
@@ -360,6 +362,7 @@ def abstention(
     missing_requested_aliases: Sequence[str] = (),
     generation_attempts: int = 1,
     repair_reason: str | None = None,
+    agent_trace: AgentTrace | None = None,
 ) -> AnswerResponse:
     return AnswerResponse(
         question=question,
@@ -379,6 +382,7 @@ def abstention(
         generation_attempts=generation_attempts,
         repair_reason=repair_reason,
         model=model,
+        agent_trace=agent_trace,
     )
 
 
@@ -400,14 +404,32 @@ class GroundedAnswerService:
 
     def answer(self, question: str, mode: AnswerMode = AnswerMode.auto) -> AnswerResponse:
         resolved_mode = infer_mode(question) if mode == AnswerMode.auto else mode
+        trace_steps = [
+            AgentStep(action="classify", status="succeeded", detail=f"mode={resolved_mode.value}"),
+            AgentStep(action="plan", status="succeeded", detail="retrieve → validate → generate → gate"),
+        ]
+        trace_plan = ["classify_question", "retrieve_evidence", "validate_grounding", "generate_or_abstain"]
+
+        def trace(stop_reason: str = "") -> AgentTrace:
+            return AgentTrace(
+                task_type=resolved_mode,
+                plan=trace_plan,
+                steps=list(trace_steps),
+                retrieval_rounds=sum(step.action == "retrieve" for step in trace_steps),
+                stop_reason=stop_reason,
+            )
+
         search = self.retriever.search(question, self.retrieval_k)
+        trace_steps.append(
+            AgentStep(action="retrieve", status="succeeded", detail=f"initial_hits={len(search.hits)}")
+        )
         known_aliases = self.known_aliases or list(dict.fromkeys(hit.alias for hit in search.hits))
         candidates = list(search.hits)
+        candidate_ids = {hit.chunk_id for hit in candidates}
         requested_aliases = extract_requested_aliases(question, known_aliases)
         available_aliases = {hit.alias for hit in candidates}
         alias_search = getattr(self.retriever, "search_alias", None)
         if alias_search is not None:
-            candidate_ids = {hit.chunk_id for hit in candidates}
             for alias in requested_aliases:
                 if alias in available_aliases:
                     continue
@@ -417,8 +439,33 @@ class GroundedAnswerService:
                         candidates.append(hit)
                         candidate_ids.add(hit.chunk_id)
                 available_aliases.update(hit.alias for hit in targeted.hits)
+                trace_steps.append(
+                    AgentStep(
+                        action="supplement_retrieve",
+                        status="succeeded",
+                        detail=f"alias={alias};hits={len(targeted.hits)}",
+                    )
+                )
+        if resolved_mode == AnswerMode.comparison and len(candidates) < 2:
+            rewritten_query = f"{question} method results limitations"
+            trace_steps.append(AgentStep(action="query_rewrite", status="started", detail=rewritten_query))
+            rewritten = self.retriever.search(rewritten_query, self.retrieval_k)
+            added = 0
+            for hit in rewritten.hits:
+                if hit.chunk_id not in candidate_ids:
+                    candidates.append(hit)
+                    candidate_ids.add(hit.chunk_id)
+                    added += 1
+            trace_steps.append(AgentStep(action="supplement_retrieve", status="succeeded", detail=f"rewritten_hits={added}"))
         plan = plan_evidence(question, candidates, self.budget, known_aliases)
         evidence = plan.evidence
+        trace_steps.append(
+            AgentStep(
+                action="evidence_gate",
+                status="succeeded" if evidence else "blocked",
+                detail=f"chunks={len(evidence)};missing_aliases={','.join(plan.missing_requested_aliases)}",
+            )
+        )
         if not evidence:
             return abstention(
                 question,
@@ -429,6 +476,7 @@ class GroundedAnswerService:
                 candidate_chunks=plan.candidate_count,
                 requested_aliases=plan.requested_aliases,
                 missing_requested_aliases=plan.missing_requested_aliases,
+                agent_trace=trace("retrieval_returned_no_evidence"),
             )
 
         spans = split_evidence_spans(evidence)
@@ -443,12 +491,14 @@ class GroundedAnswerService:
         )
         generation_attempts = 1
         repair_reason: str | None = None
+        trace_steps.append(AgentStep(action="generate", status="started"))
         content = self.client.complete(SYSTEM_PROMPT, prompt)
         try:
             raw = RawAnswer.model_validate(parse_json_object(content))
         except (json.JSONDecodeError, ValidationError, ValueError) as error:
             repair_reason = validation_issue(error)
             generation_attempts = 2
+            trace_steps.append(AgentStep(action="repair", status="started", detail=repair_reason))
             content = self.client.complete(
                 SYSTEM_PROMPT,
                 build_repair_prompt(prompt, content, repair_reason),
@@ -469,6 +519,7 @@ class GroundedAnswerService:
                     missing_requested_aliases=plan.missing_requested_aliases,
                     generation_attempts=generation_attempts,
                     repair_reason=repair_reason,
+                    agent_trace=trace("model_output_validation_failed_after_repair"),
                 )
 
         supplied_targets = set(plan.requested_aliases) - set(plan.missing_requested_aliases)
@@ -483,6 +534,7 @@ class GroundedAnswerService:
             if omitted_targets and generation_attempts == 1:
                 repair_reason = "explicit_target_not_cited:" + ",".join(omitted_targets)
                 generation_attempts = 2
+                trace_steps.append(AgentStep(action="repair", status="started", detail=repair_reason))
                 repaired_content = self.client.complete(
                     SYSTEM_PROMPT,
                     build_repair_prompt(prompt, content, repair_reason),
@@ -503,8 +555,10 @@ class GroundedAnswerService:
                         missing_requested_aliases=plan.missing_requested_aliases,
                         generation_attempts=generation_attempts,
                         repair_reason=repair_reason,
+                        agent_trace=trace("explicit_target_repair_failed"),
                     )
 
+        trace_steps.append(AgentStep(action="validate", status="succeeded", detail="citation contract checked"))
         abstention_context = {
             "candidate_chunks": plan.candidate_count,
             "evidence_aliases": plan.evidence_aliases,
@@ -512,6 +566,7 @@ class GroundedAnswerService:
             "missing_requested_aliases": plan.missing_requested_aliases,
             "generation_attempts": generation_attempts,
             "repair_reason": repair_reason,
+            "agent_trace": trace(),
         }
 
         if raw.evidence_sufficiency == EvidenceSufficiency.insufficient:
@@ -612,6 +667,7 @@ class GroundedAnswerService:
         if raw.missing_information:
             rendered.append("未找到充分证据：" + "；".join(raw.missing_information))
         status = AnswerStatus.partial if raw.evidence_sufficiency == EvidenceSufficiency.partial else AnswerStatus.answered
+        trace_steps.append(AgentStep(action="finalize", status="succeeded", detail=status.value))
         return AnswerResponse(
             question=question,
             mode=resolved_mode,
@@ -630,6 +686,7 @@ class GroundedAnswerService:
             generation_attempts=generation_attempts,
             repair_reason=repair_reason,
             model=self.client.model_name,
+            agent_trace=trace("answer_completed"),
         )
 
 

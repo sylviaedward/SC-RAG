@@ -40,6 +40,19 @@ def render_citations(claims: list[dict[str, object]]) -> None:
                 st.write(citation["excerpt"])
 
 
+def render_agent_trace(trace: dict[str, object] | None) -> None:
+    if not trace:
+        return
+    with st.expander("Agent 决策轨迹", expanded=False):
+        st.write("计划：" + " → ".join(str(item) for item in trace.get("plan", [])))
+        st.caption(
+            f"任务类型：{trace.get('task_type')} · 检索轮次：{trace.get('retrieval_rounds')} · "
+            f"停止原因：{trace.get('stop_reason') or '由回答状态决定'}"
+        )
+        for step in trace.get("steps", []):
+            st.write(f"`{step.get('action')}` · {step.get('status')} · {step.get('detail', '')}")
+
+
 st.set_page_config(page_title="SC-RAG Research Workspace", page_icon="🔬", layout="wide")
 st.markdown(
     """
@@ -74,6 +87,7 @@ with answer_tab:
                 )
                 st.markdown(result["answer"])
                 st.write(f"证据论文：{', '.join(result['evidence_aliases']) or '无'}")
+                render_agent_trace(result.get("agent_trace"))
                 if result.get("missing_information"):
                     st.info("未覆盖信息：" + "；".join(result["missing_information"]))
                 if result.get("claims"):
