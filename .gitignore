@@ -1,4 +1,8 @@
 .env
+*.key
+notes/
+*.tmp
+*debug*
 .venv/
 __pycache__/
 *.py[cod]
@@ -10,6 +14,7 @@ data/eval/source/
 
 # Generated indexes, traces, reports, and model caches.
 artifacts/
+reports/
 .qdrant/
 .cache/
 imports/

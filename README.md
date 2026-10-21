@@ -5,9 +5,13 @@ SC-RAG is an evidence-grounded research agent for stochastic-computing literatur
 The project is designed as a reproducible RAG system rather than a chat wrapper:
 
 ```text
-PDF corpus → manifest → page-aware chunks → BM25 + dense RRF retrieval
-          → alias-aware evidence planning → structured generation
-          → citation/span validation → answer or explicit abstention
+PDF corpus → manifest → page-aware chunks → BM25 + dense RRF
+          → Cross-Encoder rerank → paper diversity
+          → alias-aware evidence planning
+            ├─ targeted alias supplementation
+            └─ comparison query rewrite
+          → structured generation → citation/span validation
+          → answer or abstention + complete AgentTrace
           → literature-review extraction → cross-paper synthesis
 ```
 
@@ -26,6 +30,8 @@ chooses arbitrary tools or receives authority to bypass citation validation.
 - **Reproducible evaluation:** answerable/unanswerable regression sets, retrieval metrics, citation-contract checks, latency, repair counts, and cross-layer failure attribution are saved as JSON.
 - **Usable demo:** FastAPI exposes the contract; Streamlit presents answers, page evidence, comparisons, and research ideas.
 - **Agent harness:** every answer records classification, plan, retrieval rounds, evidence gating, repair, and finalization steps for debugging and interviews.
+- **Deterministic multi-step retrieval:** missing explicit aliases trigger targeted retrieval and comparison questions may receive one query rewrite. Each transition is recorded in `AgentTrace`; the system deliberately avoids an unconstrained LLM planner so the grounding contract remains reproducible.
+- **Cross-Encoder rerank:** the optional mmarco Cross-Encoder reranks the hybrid candidate set, uses `rrf_score` as a tie-break, and can be disabled with `--no-reranker` for ablation.
 
 ## Run modes
 
@@ -107,6 +113,12 @@ make ui
 
 Then open `http://127.0.0.1:8501`, ask a grounded question, and expand **Agent trace** to show classification, bounded retrieval supplementation, evidence gating, and the final stop reason. The same flow is available over HTTP:
 
+The Streamlit workspace shows the answer, each claim's citation (paper alias,
+PDF page, and excerpt), and an expandable AgentTrace. Add a screenshot here
+when preparing the interview version:
+
+![UI screenshot](docs/ui.png)
+
 ```bash
 curl http://127.0.0.1:8000/ready
 curl -X POST http://127.0.0.1:8000/answer \
@@ -166,6 +178,24 @@ The report records the dataset/configuration version, category metrics, latency,
 python scripts/generate_phase4_human_review.py
 ```
 
+The reranker ablation uses the same 58-question benchmark and compares the
+existing hybrid retriever with and without the optional Cross-Encoder:
+
+```bash
+python scripts/run_reranker_ablation.py
+```
+
+It writes `reports/reranker_ablation.json` (ignored by Git). Values must come
+from local execution; they are intentionally not filled in here:
+
+| Configuration | Top-5 recall | Answerable accuracy | Abstain correctness | p50 end-to-end (ms) | p95 end-to-end (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Hybrid, no reranker | {{X}} | {{X}} | {{X}} | {{X}} | {{X}} |
+| Hybrid + mmarco Cross-Encoder | {{X}} | {{X}} | {{X}} | {{X}} | {{X}} |
+
+The report explicitly labels its values as locally measured. Do not replace the
+placeholders with historical or estimated numbers.
+
 Generated indexes, traces, reports, raw PDFs, and source benchmark documents stay outside Git through `.gitignore`.
 
 ## Repository map
@@ -173,7 +203,10 @@ Generated indexes, traces, reports, raw PDFs, and source benchmark documents sta
 ```text
 src/sc_rag/answering.py          grounded answering and citation validation
 src/sc_rag/ingest.py             PDF extraction and References filtering
-src/sc_rag/hybrid.py             BM25/dense reciprocal-rank fusion
+src/sc_rag/search.py             BM25 retrieval and bilingual query expansion
+src/sc_rag/dense.py              dense index and embedding providers
+src/sc_rag/hybrid.py             BM25/dense RRF, Cross-Encoder reranking, and paper diversity
+src/sc_rag/models.py             API, citation, review, and AgentTrace schemas
 src/sc_rag/literature_review.py  two-pass paper extraction and synthesis
 src/sc_rag/api.py                FastAPI contract
 ui/app.py                        Streamlit research workspace
@@ -186,7 +219,7 @@ tests/                           retrieval, grounding, gating, and schema tests
 - `GET /health` — index readiness
 - `GET /ready` — full hybrid answering readiness, including dense artifacts and LLM configuration
 - `GET /search?q=...` — ranked citable chunks
-- `POST /answer` — grounded answer with claims, citations, status, and abstention reason
+- `POST /answer` — grounded answer with claims, citations, status, abstention reason, and optional `agent_trace` (`steps`, `retrieval_rounds`, `stop_reason`)
 - `POST /literature-review` — fact-bound multi-paper review and research ideas
 
-The public repository intentionally keeps implementation and product documentation concise. Detailed learning notes and interview preparation are maintained separately from the checkout.
+Extended design notes are maintained outside this repository.
