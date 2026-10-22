@@ -6,9 +6,6 @@
 \setlist[itemize]{leftmargin=1.4em,itemsep=1pt,topsep=2pt,parsep=0pt}
 \titleformat{\section}{\large\bfseries}{}{0pt}{}[\titlerule]
 \titlespacing*{\section}{0pt}{7pt}{3pt}
-\definecolor{metricred}{RGB}{170,35,35}
-\newcommand{\X}{\textcolor{metricred}{\{\{X\}\}}}
-\newcommand{\source}[1]{\textcolor{gray}{\footnotesize（取数：#1）}}
 
 \begin{document}
 \begin{center}
@@ -25,28 +22,23 @@
 上海/苏州 AI Agent 产品、应用开发或 RAG 工程实习
 
 \section{项目经历}
-\textbf{SC-RAG：面向随机计算文献的可追溯研究 Agent}
+\textbf{SC-RAG-Agent：面向随机计算文献的可追溯研究 Agent}
 \hfill \textit{Python / FastAPI / Streamlit / Docker}\\
-\textit{项目概述：}面向随机计算（Stochastic Computing）文献检索、证据问答与跨论文综述的研究 Agent。
+\textit{项目概述：}为随机计算研究者提供可追溯综述，避免证据丢失、比较偏置与引用幻觉。
 
 \begin{itemize}
-\item 针对 SC 论文术语精确匹配与跨语义召回的差异，构建 50 篇论文的 page-aware chunks，采用 BM25 + dense 的 RRF（$k=60$）融合并可选 Cross-Encoder 精排；Top-5 召回率为 \X。 \source{reports/reranker\_ablation.json 的 top5\_recall\_any}
-\item 针对跨论文问题容易漏检目标文献的问题，采用规则驱动的有界 Agent loop：alias 缺失时定向补检、comparison 候选不足时改写查询；不使用自主 planner 以保持 grounding 可预测，并记录 \X 个可观测步骤。 \source{phase4 answer trace 的 agent\_trace.steps}
-\item 针对模型改写引用、补全事实和生成未知来源的风险，建立 span-ID grounding contract、Pydantic 严格 schema、四态证据判定与一次 repair；58 题引用契约有效率为 \X。 \source{phase2/phase4 JSON 的 citation\_contract\_valid}
-\item 将 query、混合检索、补检、ContextBudget（10 chunks/14,000 chars）、480-char span 切分、结构化生成、引用校验串成 FastAPI 服务，提供 5 个 REST endpoint，端到端 p50/p95 延迟为 \X/\X ms。 \source{reports/reranker\_ablation.json 的 end\_to\_end\_p50/p95\_latency\_ms}
-\item 针对超时、畸形 JSON、未知 span、空证据和不完整比较，采用有限重试、单次 repair 与 fail-closed abstain；在 8 道 unanswerable 对抗题上的拒答正确率为 \X。 \source{reports/reranker\_ablation.json 的 abstain\_correctness}
+\item 纯向量检索难召回 P2LSG、Sobol 等缩写，改为 BM25+dense RRF 并加重排；覆盖 50 篇论文、固定 $k=60$，兼顾术语与语义。
+\item 固定单轮检索常漏掉比较题目标，改为规则驱动补检；弃用 LLM planner 降低工具幻觉，按 alias 缺失/候选不足触发 2 类补检。
+\item 模型会改写引用且证据不足仍硬答，改为 span-ID 契约、Pydantic 校验、四态门控和单次修复；5 类异常统一 fail-closed。
+\item 只跑通难定位失败，改为 58题（50+8）基准、phase4/消融与 AgentTrace；FastAPI+Streamlit+Docker 交付 5 接口。
 \end{itemize}
 
 \section{技能}
 \begin{tabularx}{\textwidth}{@{}>{\bfseries}p{2.4cm}X@{}}
-语言 & Python（熟练）；SQL、TypeScript（了解）\\
-后端 & FastAPI、RESTful API 设计、Pydantic 结构化校验\\
-前端 & Streamlit\\
-AI & RAG（BM25 / dense / RRF / Cross-Encoder rerank）、规则驱动 Agent loop、Prompt Engineering、Function Calling（了解）、LangChain / LangGraph / MCP（了解）\\
-工程 & Docker、Docker Compose、Makefile、pytest、Git、Linux\\
+技能 & Python / FastAPI / Streamlit / Docker / RAG（BM25+dense+RRF+rerank）/ 自研 agent loop / Prompt Engineering / Pydantic / pytest\\
 \end{tabularx}
 
 \section{补充信息}
-根据岗位要求补充可实习时间、英语能力、城市与到岗安排。项目性能数字只填写对应评测脚本生成的结果。
+根据岗位要求补充可实习时间、英语能力、城市与到岗安排。
 
 \end{document}
