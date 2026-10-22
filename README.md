@@ -163,18 +163,8 @@ python scripts/run_reranker_ablation.py
 The script compares `no_reranker` and `reranker` on the same 58 questions and
 writes `reports/reranker_ablation.json`. It reports Top-5 recall, answerable
 accuracy, abstain correctness, and retrieval/end-to-end p50 and p95 latency.
-Run the script to fill the measured values; the placeholders below are not
-performance claims.
-
-| Metric | no_reranker | reranker |
-| --- | ---: | ---: |
-| Top-5 recall | {{X}} | {{X}} |
-| Answerable accuracy | {{X}} | {{X}} |
-| Abstain correctness | {{X}} | {{X}} |
-| Retrieval p50 latency (ms) | {{X}} | {{X}} |
-| Retrieval p95 latency (ms) | {{X}} | {{X}} |
-| End-to-end p50 latency (ms) | {{X}} | {{X}} |
-| End-to-end p95 latency (ms) | {{X}} | {{X}} |
+The clean-checkout status and the prerequisites for producing these metrics
+are documented in [reports/evaluation_status.md](reports/evaluation_status.md).
 
 To inspect the ten human-reviewed attribution cases:
 
@@ -182,8 +172,10 @@ To inspect the ten human-reviewed attribution cases:
 python scripts/generate_phase4_human_review.py
 ```
 
-Generated indexes, traces, reports, raw PDFs, and source benchmark documents
-are excluded from Git.
+Generated indexes, traces, raw PDFs, and source benchmark documents are
+excluded from Git. The tracked [evaluation status report](reports/evaluation_status.md)
+records the checks that can run in a clean checkout and the inputs required for
+the full model evaluation.
 
 ## Repository map
 
